@@ -48,9 +48,6 @@ export interface UIStrings {
   freezeActive: (n: number) => string;
   soundOn: string;
   soundOff: string;
-  /** полноэкранный режим (кнопка-стрелки в меню и в игре) */
-  fullscreenOn: string;
-  fullscreenOff: string;
   pause: string;
 
   bannerEasy: string;
@@ -88,8 +85,6 @@ export interface UIStrings {
   kidsOverTitle: string;
   kidsOverBody: string;
   tryAgain: string;
-  memoryPreview: string;
-  memoryPreviewLeft: (n: number) => string;
   pairsLeft: (n: number) => string;
   loading: string;
   back: string;
@@ -170,8 +165,6 @@ const RU: UIStrings = {
   freezeActive: (n) => `Время стоит, ещё ${n} с`,
   soundOn: 'Выключить звук',
   soundOff: 'Включить звук',
-  fullscreenOn: 'На весь экран',
-  fullscreenOff: 'Выйти из полного экрана',
   pause: 'Пауза',
 
   bannerEasy: 'этот полегче 😊',
@@ -216,8 +209,6 @@ const RU: UIStrings = {
   kidsOverTitle: 'Время вышло!',
   kidsOverBody: 'Ничего страшного! Уровень не сбрасывается — попробуй ещё раз',
   tryAgain: 'Ещё раз',
-  memoryPreview: 'Запоминай!',
-  memoryPreviewLeft: (n) => `${n}…`,
   pairsLeft: (n) => `Пар: ${n}`,
   loading: 'Загрузка…',
   back: 'Назад',
@@ -304,8 +295,6 @@ const EN: UIStrings = {
   freezeActive: (n) => `Time is frozen, ${n}s left`,
   soundOn: 'Mute',
   soundOff: 'Unmute',
-  fullscreenOn: 'Fullscreen',
-  fullscreenOff: 'Exit fullscreen',
   pause: 'Pause',
 
   bannerEasy: 'an easier one 😊',
@@ -349,8 +338,6 @@ const EN: UIStrings = {
   kidsOverTitle: 'Time is up!',
   kidsOverBody: 'No worries! The level is not reset — try again',
   tryAgain: 'Try again',
-  memoryPreview: 'Memorize!',
-  memoryPreviewLeft: (n) => `${n}…`,
   pairsLeft: (n) => `Pairs: ${n}`,
   loading: 'Loading…',
   back: 'Back',

@@ -15,7 +15,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { IconClock, IconExpand, IconPause, IconShrink, IconSkip, IconSoundOff, IconSoundOn, IconStar } from './GameIcons';
+import { IconClock, IconPause, IconSkip, IconSoundOff, IconSoundOn, IconStar } from './GameIcons';
 import {
   pickKinds,
   themeForLevel,
@@ -29,7 +29,6 @@ import {
   memoryPairsForLevel,
 } from '@/lib/onet/memory';
 import { sound } from '@/lib/onet/sound';
-import { useFullscreen } from '@/lib/onet/fullscreen';
 import type { Lang, UIStrings } from '@/lib/onet/i18n';
 
 export interface MemoryGameProps {
@@ -151,8 +150,6 @@ export default function MemoryGame({
   const [pops, setPops] = useState<Pop[]>([]);
   const winCalledRef = useRef(false);
   const timersRef = useRef<number[]>([]);
-  /* полноэкранный режим: кнопка-стрелки рядом с паузой */
-  const fs = useFullscreen();
 
   const inPreview = previewLeft > 0;
   const blocked = paused || adBusy || lock || inPreview;
@@ -305,7 +302,15 @@ export default function MemoryGame({
           <span className="shrink-0 rounded-full bg-white/70 px-2.5 py-1 text-xs font-bold text-teal-900/80">
             {t.pairsLeft((deck.length - matched.length) / 2)}
           </span>
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-white/70 px-2.5 py-1 text-xs font-bold tabular-nums text-teal-900/80">
+          <span
+            className={
+              'flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ' +
+              (inPreview
+                ? 'mem-count--preview'
+                : 'bg-white/70 text-teal-900/80')
+            }
+            aria-live={inPreview ? 'polite' : undefined}
+          >
             <IconClock className="h-4 w-4" aria-hidden="true" />
             {inPreview ? previewLeft : `${minutes}:${String(seconds).padStart(2, '0')}`}
           </span>
@@ -328,17 +333,6 @@ export default function MemoryGame({
           >
             {soundOn ? <IconSoundOn className="h-6 w-6" /> : <IconSoundOff className="h-6 w-6" />}
           </button>
-          {fs.supported && (
-            <button
-              type="button"
-              onClick={fs.toggle}
-              aria-label={fs.isFullscreen ? t.fullscreenOff : t.fullscreenOn}
-              title={fs.isFullscreen ? t.fullscreenOff : t.fullscreenOn}
-              className="game-action-btn game-action-btn--sm game-action-btn--sound"
-            >
-              {fs.isFullscreen ? <IconShrink className="h-6 w-6" /> : <IconExpand className="h-6 w-6" />}
-            </button>
-          )}
           <button
             type="button"
             onClick={onPause}
@@ -414,14 +408,6 @@ export default function MemoryGame({
                   <span>{p.name}</span>
                 </div>
               ))}
-
-              {/* предпросмотр: «Запоминай! N…» */}
-              {inPreview && (
-                <div className="mem-preview" role="status" aria-live="polite">
-                  <span>{t.memoryPreview}</span>
-                  <span className="mem-preview-count">{t.memoryPreviewLeft(previewLeft)}</span>
-                </div>
-              )}
             </div>
           )}
         </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { IconExpand, IconFlag, IconFreeze, IconHint, IconPause, IconShrink, IconShuffle, IconSoundOff, IconSoundOn, IconStar } from './GameIcons';
+import { IconFlag, IconFreeze, IconHint, IconPause, IconShuffle, IconSoundOff, IconSoundOn, IconStar } from './GameIcons';
 import {
   BONUS_CAPS,
   CHECKPOINT_EVERY,
@@ -28,8 +28,8 @@ import {
   type Point,
 } from '@/lib/onet/engine';
 import { stringsFor, type Lang } from '@/lib/onet/i18n';
+import { MEMORY_PREVIEW_SEC } from '@/lib/onet/memory';
 import { sound } from '@/lib/onet/sound';
-import { useFullscreen } from '@/lib/onet/fullscreen';
 import { showRewardedAd, type RewardedResult } from '@/lib/ads/yandex';
 import Board, { type DyingTile, type NamePopup } from './Board';
 import MemoryGame from './MemoryGame';
@@ -275,8 +275,6 @@ export default function OnetGame() {
   const [lastRun, setLastRun] = useState<LastRun | null>(null);
   /** подтверждение пропуска уровня: «посмотреть рекламу и пропустить?» */
   const [skipOffer, setSkipOffer] = useState(false);
-  /** полноэкранный режим (кнопка-стрелки в шапке) */
-  const fs = useFullscreen();
 
   /* Прогресс читается один раз при старте (компонент только клиентский) */
   const [progress, setProgress] = useState<Progress>(() => {
@@ -575,9 +573,16 @@ export default function OnetGame() {
         easy: false,
         theme: themeForLevel(level),
       });
-      setBanner(level);
       setPhase('playing');
-      const id = window.setTimeout(() => setBanner(null), BANNER_MS + 60);
+      /* «Найди пары»: баннер уровня появляется ТОЛЬКО после предпросмотра —
+         во время запоминания поле полностью чистое, ничего не перекрывает
+         карточки; предпросмотр длится ровно MEMORY_PREVIEW_SEC от маунта
+         (паузу не учитывает — как и сам отсчёт в MemoryGame) */
+      const id = window.setTimeout(() => {
+        setBanner(level);
+        const id2 = window.setTimeout(() => setBanner(null), BANNER_MS + 60);
+        trackTimer(id2);
+      }, MEMORY_PREVIEW_SEC * 1000);
       trackTimer(id);
     },
     [clearTransient, trackTimer]
@@ -1359,17 +1364,6 @@ export default function OnetGame() {
               >
                 {sound.enabled ? <IconSoundOn className="h-6 w-6" /> : <IconSoundOff className="h-6 w-6" />}
               </button>
-              {fs.supported && (
-                <button
-                  type="button"
-                  onClick={fs.toggle}
-                  aria-label={fs.isFullscreen ? t.fullscreenOff : t.fullscreenOn}
-                  title={fs.isFullscreen ? t.fullscreenOff : t.fullscreenOn}
-                  className="game-action-btn game-action-btn--sm game-action-btn--sound"
-                >
-                  {fs.isFullscreen ? <IconShrink className="h-6 w-6" /> : <IconExpand className="h-6 w-6" />}
-                </button>
-              )}
               {phase === 'playing' && (
                 <button
                   type="button"
@@ -1399,6 +1393,7 @@ export default function OnetGame() {
                 kids={isKids}
                 theme={session?.theme}
                 checkpoint={!isKids && isCheckpointLevel(banner)}
+                low={isMemory}
               />
             )}
             {toast && <Toast message={toast} />}

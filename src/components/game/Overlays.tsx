@@ -18,7 +18,6 @@ import {
   IconCards,
   IconClock,
   IconDoor,
-  IconExpand,
   IconFire,
   IconFlag,
   IconGear,
@@ -31,7 +30,6 @@ import {
   IconParty,
   IconPlay,
   IconRefresh,
-  IconShrink,
   IconShuffle,
   IconFreeze,
   IconSkip,
@@ -42,7 +40,6 @@ import {
   IconX,
   type GameIconProps,
 } from './GameIcons';
-import { useFullscreen } from '@/lib/onet/fullscreen';
 
 /* ============ Общие типы ============ */
 
@@ -146,8 +143,6 @@ export function MenuScreen({
   const [view, setView] = useState<'main' | 'kids'>('main');
   /* настройки живут в отдельном окне — не мешают глазам в меню */
   const [showSettings, setShowSettings] = useState(false);
-  /* полноэкранный режим: убирает браузерную панель — игра на весь экран */
-  const fs = useFullscreen();
 
   return (
     <div className="relative flex h-full w-full flex-col items-center justify-center overflow-y-auto p-4 text-center">
@@ -156,19 +151,6 @@ export function MenuScreen({
         <img src="/menu-bg.webp" alt="" draggable={false} />
         <div className="menu-bg-veil" />
       </div>
-
-      {/* Полноэкранный режим: одна кнопка в углу, убирает лишние панели */}
-      {fs.supported && (
-        <button
-          type="button"
-          onClick={fs.toggle}
-          aria-label={fs.isFullscreen ? t.fullscreenOff : t.fullscreenOn}
-          title={fs.isFullscreen ? t.fullscreenOff : t.fullscreenOn}
-          className="game-action-btn game-action-btn--sm game-action-btn--sound absolute left-4 top-4 z-10 mt-[env(safe-area-inset-top)]"
-        >
-          {fs.isFullscreen ? <IconShrink className="h-6 w-6" /> : <IconExpand className="h-6 w-6" />}
-        </button>
-      )}
 
       {/* Заголовок: ярлык игры + название */}
       <div className="relative z-[1] flex items-center gap-4">
@@ -471,9 +453,11 @@ export interface LevelBannerProps {
   theme?: LevelTheme;
   /** уровень-чекпоинт: «пройди — и игра сохранится» */
   checkpoint?: boolean;
+  /** «найди пары»: баннер внизу — не мешает запоминать карточки */
+  low?: boolean;
 }
 
-export function LevelBanner({ level, t, kids, theme, checkpoint }: LevelBannerProps) {
+export function LevelBanner({ level, t, kids, theme, checkpoint, low }: LevelBannerProps) {
   const easy = isEasyLevel(level);
   let sub: string | undefined;
   if (kids) {
@@ -485,7 +469,7 @@ export function LevelBanner({ level, t, kids, theme, checkpoint }: LevelBannerPr
   }
   return (
     <div
-      className="level-banner"
+      className={'level-banner' + (low ? ' level-banner--low' : '')}
       role="status"
       aria-live="polite"
     >

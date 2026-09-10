@@ -870,30 +870,28 @@
 .mem-card--matched .mem-card-inner {
   animation: onet-mem-boom 0.75s ease-in forwards;
 }
-/* отсчёт предпросмотра: «Запоминай! 5…» */
-.mem-preview {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 40;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2em;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, rgba(13, 148, 136, 0.95), rgba(5, 150, 105, 0.95));
-  color: #fff;
-  font-size: clamp(1.1rem, 4vw, 1.7rem);
-  font-weight: 900;
-  padding: 0.6em 1.4em;
-  box-shadow: 0 10px 30px rgba(13, 148, 136, 0.5);
-  pointer-events: none;
-  animation: onet-banner 5.2s ease forwards;
+/* «найди пары»: баннер уровня внизу — не мешает запоминать карточки,
+   центр поля остаётся чистым на весь предпросмотр */
+.level-banner--low {
+  top: 70%;
 }
-.mem-preview-count {
-  font-size: 1.6em;
-  line-height: 1;
+/* отсчёт запоминания живёт в шапке (в чипе часов): заметный янтарный,
+   мягко пульсирует — видно из любого угла, карточки не закрывает */
+.mem-count--preview {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #fff;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45);
+  animation: onet-count-pulse 1s ease-in-out infinite;
+}
+@keyframes onet-count-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.14);
+  }
 }
 
 @keyframes onet-menu-float {
