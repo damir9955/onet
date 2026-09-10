@@ -4,7 +4,7 @@
   "description": "Нажимай на две одинаковые картинки, чтобы соединить их. Классика с чекпоинтами и турнирной таблицей + детский режим с игрой «Найди одинаковые»: крупные плитки, звери, фрукты и овощи.",
   "id": "/",
   "start_url": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#e6f7f1",
   "theme_color": "#0d9488",

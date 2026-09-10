@@ -59,19 +59,27 @@ export function createMemoryDeck(pairs: number, kindsCount: number): MemoryCard[
   return shuffleInPlace(cards);
 }
 
-/** Сетка memory под число карточек (landscape: поле шире, чем выше) */
-export function memoryGridForCards(cards: number): { rows: number; cols: number } {
+/** Сетка memory под число карточек: ТОЧНО n клеток (rows × cols = n) —
+ *  карточки идеально заполняют поле, без пустых мест в последней строке.
+ *  Игра всегда в landscape (портретные телефоны разворачиваются CSS-ом),
+ *  поэтому cols ≥ rows. areaAspect — пропорции области (w/h): из всех
+ *  точных факторизаций выбираем ту, что даёт самые КРУПНЫЕ квадратные
+ *  карточки (как в соединялке — фото не обрезаются). */
+export function memoryGridForCards(
+  cards: number,
+  areaAspect = 1.4
+): { rows: number; cols: number } {
   const n = Math.max(4, Math.ceil(cards / 2) * 2);
-  // подбираем cols/rows: клетки почти квадратные при landscape-пропорции ~1.4
-  let best = { rows: 2, cols: Math.ceil(n / 2), score: Infinity };
+  const aspect = Number.isFinite(areaAspect) && areaAspect > 0.3 ? areaAspect : 1.4;
+  let best = { rows: 2, cols: n / 2, score: -1 };
   for (let rows = 2; rows <= 8; rows++) {
-    const cols = Math.ceil(n / rows);
-    if (cols > 12) continue;
-    if (cols < rows) continue; // шире, чем выше
-    if ((rows * cols - n) > Math.max(1, Math.ceil(n * 0.15))) continue;
-    const score = rows * cols - n + Math.abs(cols - rows * 1.35) * 0.4;
-    if (score < best.score) best = { rows, cols, score };
+    if (n % rows !== 0) continue; // только точное заполнение
+    const cols = n / rows;
+    if (cols < rows) continue; // шире, чем выше (landscape)
+    if (cols > 14) continue;
+    // размер квадратной карточки при высоте области = 1
+    const size = Math.min(aspect / cols, 1 / rows);
+    if (size > best.score) best = { rows, cols, score: size };
   }
-  // крайние случаи: последняя строка может быть неполной
-  return { rows: best.rows, cols: Math.ceil(n / best.rows) };
+  return { rows: best.rows, cols: best.cols };
 }

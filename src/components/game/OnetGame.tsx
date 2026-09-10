@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { IconFlag, IconFreeze, IconHint, IconPause, IconShuffle, IconSoundOff, IconSoundOn, IconStar } from './GameIcons';
+import { IconExpand, IconFlag, IconFreeze, IconHint, IconPause, IconShrink, IconShuffle, IconSoundOff, IconSoundOn, IconStar } from './GameIcons';
 import {
   BONUS_CAPS,
   CHECKPOINT_EVERY,
@@ -29,6 +29,7 @@ import {
 } from '@/lib/onet/engine';
 import { stringsFor, type Lang } from '@/lib/onet/i18n';
 import { sound } from '@/lib/onet/sound';
+import { useFullscreen } from '@/lib/onet/fullscreen';
 import { showRewardedAd, type RewardedResult } from '@/lib/ads/yandex';
 import Board, { type DyingTile, type NamePopup } from './Board';
 import MemoryGame from './MemoryGame';
@@ -43,6 +44,7 @@ import {
   MenuScreen,
   PauseModal,
   SimAdOverlay,
+  SkipConfirmModal,
   Toast,
   WinModal,
   type Bonuses,
@@ -271,6 +273,10 @@ export default function OnetGame() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   /** итог забега для экрана проигрыша */
   const [lastRun, setLastRun] = useState<LastRun | null>(null);
+  /** подтверждение пропуска уровня: «посмотреть рекламу и пропустить?» */
+  const [skipOffer, setSkipOffer] = useState(false);
+  /** полноэкранный режим (кнопка-стрелки в шапке) */
+  const fs = useFullscreen();
 
   /* Прогресс читается один раз при старте (компонент только клиентский) */
   const [progress, setProgress] = useState<Progress>(() => {
@@ -1239,8 +1245,17 @@ export default function OnetGame() {
   return (
     /* Горизонтальный вьюпорт: в портретной ориентации экран поворачивается
         CSS'ом (.app-viewport из globals.css) — игра сразу открывается
-        в горизонтальном режиме на любом устройстве */
-    <div className="app-viewport bg-gradient-to-b from-teal-100 via-emerald-50 to-amber-100">
+        в горизонтальном режиме на любом устройстве.
+        Детский режим — тёплый персиковый фон (отличается от бирюзового
+        классического, не сливается с ним и с меню) */
+    <div
+      className={
+        'app-viewport ' +
+        (isKids
+          ? 'bg-gradient-to-b from-amber-100 via-orange-50 to-rose-100'
+          : 'bg-gradient-to-b from-teal-100 via-emerald-50 to-amber-100')
+      }
+    >
       <div className="h-full w-full overflow-hidden text-teal-950">
       {showGame ? (
         <div className="flex h-full select-none flex-col">
@@ -1344,6 +1359,17 @@ export default function OnetGame() {
               >
                 {sound.enabled ? <IconSoundOn className="h-6 w-6" /> : <IconSoundOff className="h-6 w-6" />}
               </button>
+              {fs.supported && (
+                <button
+                  type="button"
+                  onClick={fs.toggle}
+                  aria-label={fs.isFullscreen ? t.fullscreenOff : t.fullscreenOn}
+                  title={fs.isFullscreen ? t.fullscreenOff : t.fullscreenOn}
+                  className="game-action-btn game-action-btn--sm game-action-btn--sound"
+                >
+                  {fs.isFullscreen ? <IconShrink className="h-6 w-6" /> : <IconExpand className="h-6 w-6" />}
+                </button>
+              )}
               {phase === 'playing' && (
                 <button
                   type="button"
@@ -1394,7 +1420,7 @@ export default function OnetGame() {
                 onWin={handleMemoryWin}
                 onPause={pauseGame}
                 onExit={goMenu}
-                onSkip={() => runAd('skip')}
+                onSkip={() => setSkipOffer(true)}
                 onToggleSound={handleToggleSound}
               />
             )}
@@ -1446,7 +1472,7 @@ export default function OnetGame() {
           level={session.level}
           onResume={resumeGame}
           onMenu={requestExit}
-          onSkipLevel={isKids ? () => runAd('skip') : undefined}
+          onSkipLevel={isKids ? () => setSkipOffer(true) : undefined}
           adBusy={adBusy}
         />
       )}
@@ -1495,8 +1521,21 @@ export default function OnetGame() {
               isKids ? session.kidsGame : 'onet'
             )
           }
-          onSkip={isKids ? () => runAd('skip') : undefined}
+          onSkip={isKids ? () => setSkipOffer(true) : undefined}
           onMenu={goMenu}
+        />
+      )}
+
+      {/* Пропуск уровня: сначала спрашиваем — «смотреть рекламу и пропустить?» */}
+      {skipOffer && !simAd && phase !== 'menu' && (
+        <SkipConfirmModal
+          t={t}
+          level={session?.level ?? pendingLevel ?? 1}
+          onWatch={() => {
+            setSkipOffer(false);
+            runAd('skip');
+          }}
+          onClose={() => setSkipOffer(false)}
         />
       )}
 

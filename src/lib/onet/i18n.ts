@@ -48,6 +48,9 @@ export interface UIStrings {
   freezeActive: (n: number) => string;
   soundOn: string;
   soundOff: string;
+  /** полноэкранный режим (кнопка-стрелки в меню и в игре) */
+  fullscreenOn: string;
+  fullscreenOff: string;
   pause: string;
 
   bannerEasy: string;
@@ -79,6 +82,9 @@ export interface UIStrings {
   cpChipSave: string;
   winSaved: string;
   skipLevel: string;
+  skipConfirmTitle: string;
+  skipConfirmBody: (nextLevel: number) => string;
+  watchAdSkip: string;
   kidsOverTitle: string;
   kidsOverBody: string;
   tryAgain: string;
@@ -164,6 +170,8 @@ const RU: UIStrings = {
   freezeActive: (n) => `Время стоит, ещё ${n} с`,
   soundOn: 'Выключить звук',
   soundOff: 'Включить звук',
+  fullscreenOn: 'На весь экран',
+  fullscreenOff: 'Выйти из полного экрана',
   pause: 'Пауза',
 
   bannerEasy: 'этот полегче 😊',
@@ -201,6 +209,10 @@ const RU: UIStrings = {
   cpChipSave: 'сохранение!',
   winSaved: 'Прогресс сохранён',
   skipLevel: 'Пропустить за рекламу',
+  skipConfirmTitle: 'Пропустить уровень?',
+  skipConfirmBody: (nextLevel) =>
+    `Посмотрите короткую рекламу — и сразу начнётся уровень ${nextLevel}`,
+  watchAdSkip: 'Смотреть рекламу и пропустить',
   kidsOverTitle: 'Время вышло!',
   kidsOverBody: 'Ничего страшного! Уровень не сбрасывается — попробуй ещё раз',
   tryAgain: 'Ещё раз',
@@ -292,6 +304,8 @@ const EN: UIStrings = {
   freezeActive: (n) => `Time is frozen, ${n}s left`,
   soundOn: 'Mute',
   soundOff: 'Unmute',
+  fullscreenOn: 'Fullscreen',
+  fullscreenOff: 'Exit fullscreen',
   pause: 'Pause',
 
   bannerEasy: 'an easier one 😊',
@@ -329,6 +343,9 @@ const EN: UIStrings = {
   cpChipSave: 'saving!',
   winSaved: 'Progress saved',
   skipLevel: 'Skip for an ad',
+  skipConfirmTitle: 'Skip the level?',
+  skipConfirmBody: (nextLevel) => `Watch a short ad and jump straight to level ${nextLevel}`,
+  watchAdSkip: 'Watch ad & skip',
   kidsOverTitle: 'Time is up!',
   kidsOverBody: 'No worries! The level is not reset — try again',
   tryAgain: 'Try again',

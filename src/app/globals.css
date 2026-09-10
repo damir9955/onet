@@ -775,14 +775,11 @@
   }
 }
 
-/* ============ Игра «Найди одинаковые» (memory) ============ */
+/* ============ Игра «Найди одинаковые» (memory) ============
+   Карточки КВАДРАТНЫЕ, как в соединялке: размер задаётся компонентом
+   (замер области), сетка ровно под колоду — без пустых мест. */
 .mem-grid {
   display: grid;
-  gap: 0.6rem;
-  width: min(100%, 56rem);
-  height: 100%;
-  max-height: 100%;
-  padding: 0.25rem;
 }
 .mem-card {
   position: relative;
@@ -809,7 +806,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 18%;
+  border-radius: 20%;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   overflow: hidden;
@@ -850,7 +847,7 @@
 .mem-card:focus-visible {
   outline: 3px solid rgba(13, 148, 136, 0.7);
   outline-offset: 2px;
-  border-radius: 18%;
+  border-radius: 20%;
 }
 /* найденная пара: «взрывается» */
 @keyframes onet-mem-boom {

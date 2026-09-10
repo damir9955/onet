@@ -1,39 +1,98 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Иконка «Клик-Клак»: лев и яблоко на белых плитках,
+       между ними — золотая молния соединения (как в игре).
+       Фон — изумрудно-бирюзовый градиент, боке-искры. -->
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#99f6e4"/>
-      <stop offset="55%" stop-color="#5eead4"/>
-      <stop offset="100%" stop-color="#fbbf24"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0%" stop-color="#a7f3d0"/>
+      <stop offset="38%" stop-color="#2dd4bf"/>
+      <stop offset="100%" stop-color="#0e7490"/>
     </linearGradient>
-    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#e2e8f0"/>
-    </linearGradient>
-    <linearGradient id="line" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0d9488"/>
+    <linearGradient id="bolt" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="55%" stop-color="#fbbf24"/>
       <stop offset="100%" stop-color="#f59e0b"/>
     </linearGradient>
+    <linearGradient id="fur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fcd34d"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <radialGradient id="apple" cx="0.35" cy="0.3" r="1">
+      <stop offset="0%" stop-color="#f87171"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <rect x="16" y="16" width="480" height="480" rx="110" fill="url(#bg)"/>
-  <!-- соединительная линия с двумя поворотами -->
-  <polyline
-    points="140,330 140,400 400,400 400,180"
-    fill="none"
-    stroke="url(#line)"
-    stroke-width="34"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    opacity="0.9"
-  />
-  <!-- плитка 1 (внизу слева) -->
-  <rect x="76" y="266" width="128" height="128" rx="30" fill="url(#tile)" stroke="#cbd5e1" stroke-width="4"/>
-  <circle cx="140" cy="330" r="34" fill="#ef4444"/>
-  <path d="M140 296 q6 -18 26 -22 q-2 20 -26 22" fill="#84cc16"/>
-  <!-- плитка 2 (вверху справа) -->
-  <rect x="336" y="116" width="128" height="128" rx="30" fill="url(#tile)" stroke="#cbd5e1" stroke-width="4"/>
-  <circle cx="400" cy="180" r="34" fill="#ef4444"/>
-  <path d="M400 146 q6 -18 26 -22 q-2 20 -26 22" fill="#84cc16"/>
-  <!-- точки-соединения -->
-  <circle cx="140" cy="330" r="16" fill="#0d9488"/>
-  <circle cx="400" cy="180" r="16" fill="#f59e0b"/>
+
+  <!-- фон-плитка -->
+  <rect width="512" height="512" rx="110" fill="url(#bg)"/>
+
+  <!-- боке-искры -->
+  <circle cx="92" cy="84" r="11" fill="#ffffff" opacity="0.5"/>
+  <circle cx="430" cy="424" r="15" fill="#ffffff" opacity="0.32"/>
+  <circle cx="404" cy="58" r="7" fill="#ffffff" opacity="0.6"/>
+  <circle cx="58" cy="212" r="8" fill="#ffffff" opacity="0.4"/>
+  <circle cx="252" cy="26" r="6" fill="#ffffff" opacity="0.5"/>
+  <circle cx="470" cy="250" r="9" fill="#ffffff" opacity="0.35"/>
+
+  <!-- тёплые подложки под плитками -->
+  <ellipse cx="336" cy="152" rx="100" ry="92" fill="#0d9488" opacity="0.35"/>
+  <ellipse cx="168" cy="362" rx="112" ry="104" fill="#0d9488" opacity="0.35"/>
+
+  <!-- ПЛИТКА: яблоко (верх-право) -->
+  <g transform="translate(246,58)">
+    <rect width="180" height="180" rx="42" fill="#ffffff"/>
+    <rect x="6" y="6" width="168" height="168" rx="37" fill="none" stroke="#e2f7f1" stroke-width="4"/>
+    <!-- черенок -->
+    <path d="M92 60 C 92 47 96 40 104 34" stroke="#7c4a21" stroke-width="9" stroke-linecap="round" fill="none"/>
+    <!-- листик -->
+    <path d="M104 47 C 120 29 143 31 145 35 C 143 55 122 65 106 57 Z" fill="#4ade80" stroke="#16a34a" stroke-width="4" stroke-linejoin="round"/>
+    <!-- яблоко -->
+    <path d="M92 132 C 57 132 46 97 60 74 C 70 56 84 56 92 63 C 100 56 114 56 124 74 C 138 97 127 132 92 132 Z" fill="url(#apple)"/>
+    <!-- блик -->
+    <ellipse cx="72" cy="86" rx="10" ry="17" fill="#ffffff" opacity="0.75" transform="rotate(-18 72 86)"/>
+  </g>
+
+  <!-- МОЛНИЯ: соединение яблока со львом -->
+  <ellipse cx="238" cy="286" rx="120" ry="120" fill="url(#glow)"/>
+  <path d="M268 212 L 206 288 L 242 291 L 196 368 L 288 278 L 250 275 Z" fill="url(#bolt)" stroke="#f59e0b" stroke-width="7" stroke-linejoin="round"/>
+
+  <!-- ПЛИТКА: лев (низ-лево) -->
+  <g transform="translate(56,236)">
+    <rect width="200" height="200" rx="46" fill="#ffffff"/>
+    <!-- грива -->
+    <circle cx="100" cy="104" r="72" fill="#d97706"/>
+    <g fill="#b45309">
+      <circle cx="100" cy="32" r="10"/>
+      <circle cx="151" cy="53" r="10"/>
+      <circle cx="172" cy="104" r="10"/>
+      <circle cx="151" cy="155" r="10"/>
+      <circle cx="100" cy="176" r="10"/>
+      <circle cx="49" cy="155" r="10"/>
+      <circle cx="28" cy="104" r="10"/>
+      <circle cx="49" cy="53" r="10"/>
+    </g>
+    <!-- уши -->
+    <circle cx="64" cy="58" r="19" fill="#fbbf24" stroke="#d97706" stroke-width="5"/>
+    <circle cx="136" cy="58" r="19" fill="#fbbf24" stroke="#d97706" stroke-width="5"/>
+    <!-- голова -->
+    <circle cx="100" cy="104" r="50" fill="url(#fur)"/>
+    <!-- морда -->
+    <ellipse cx="100" cy="124" rx="30" ry="24" fill="#fde68a"/>
+    <!-- глаза -->
+    <circle cx="82" cy="94" r="7.5" fill="#1f2937"/>
+    <circle cx="118" cy="94" r="7.5" fill="#1f2937"/>
+    <circle cx="84.5" cy="91" r="2.6" fill="#ffffff"/>
+    <circle cx="120.5" cy="91" r="2.6" fill="#ffffff"/>
+    <!-- нос -->
+    <path d="M100 110 L 108.5 118 L 100 124.5 L 91.5 118 Z" fill="#7c2d12"/>
+    <!-- улыбка -->
+    <path d="M100 124.5 L 100 133 M 100 133 C 95 141 86.5 141 82.5 136 M 100 133 C 105 141 113.5 141 117.5 136" stroke="#7c2d12" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+    <!-- усы-точки -->
+    <circle cx="68" cy="120" r="2.2" fill="#b45309"/>
+    <circle cx="132" cy="120" r="2.2" fill="#b45309"/>
+  </g>
 </svg>

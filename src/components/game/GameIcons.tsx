@@ -422,6 +422,36 @@ export function IconClock({ className }: GameIconProps) {
   );
 }
 
+/** Полноэкранный режим — стрелки, растягивающие экран наружу */
+export function IconExpand({ className }: GameIconProps) {
+  return (
+    <Svg className={className}>
+      <g fill="none" stroke="#0f766e" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3.5 9V4.6A1.1 1.1 0 014.6 3.5H9" />
+        <path d="M15 3.5h4.4a1.1 1.1 0 011.1 1.1V9" />
+        <path d="M20.5 15v4.4a1.1 1.1 0 01-1.1 1.1H15" />
+        <path d="M9 20.5H4.6a1.1 1.1 0 01-1.1-1.1V15" />
+      </g>
+      <path d="M8.2 15.8L3.6 20.4M15.8 15.8l4.6 4.6M8.2 8.2L3.6 3.6M15.8 8.2l4.6-4.6" stroke="#f59e0b" strokeWidth="2.6" strokeLinecap="round" fill="none" />
+    </Svg>
+  );
+}
+
+/** Полноэкранный режим — стрелки, сжимающие экран внутрь */
+export function IconShrink({ className }: GameIconProps) {
+  return (
+    <Svg className={className}>
+      <g fill="none" stroke="#0f766e" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 3.5v4.4a1.1 1.1 0 01-1.1 1.1H3.5" />
+        <path d="M20.5 9h-4.4a1.1 1.1 0 01-1.1-1.1V3.5" />
+        <path d="M15 20.5v-4.4a1.1 1.1 0 011.1-1.1h4.4" />
+        <path d="M3.5 15h4.4a1.1 1.1 0 011.1 1.1v4.4" />
+      </g>
+      <path d="M9 9l-4.6 4.6M15 9l4.6 4.6M9 15l-4.6 4.6M15 15l4.6 4.6" stroke="#f59e0b" strokeWidth="2.6" strokeLinecap="round" fill="none" />
+    </Svg>
+  );
+}
+
 /** Победа — звезда с конфетти */
 export function IconParty({ className }: GameIconProps) {
   return (

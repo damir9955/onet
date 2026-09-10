@@ -160,7 +160,7 @@ const FAMILIES: FamilyDef[] = [
   {
     h: 70,
     kinds: [
-      { e: '🧅', name: 'onion', cat: 'plant', ru: 'Луковка', en: 'Onion' },
+      { e: '🧅', name: 'onion', cat: 'plant', ru: 'Лук', en: 'Onion' },
       { e: '🧄', name: 'garlic', cat: 'plant', ru: 'Чеснок', en: 'Garlic' },
     ],
   },

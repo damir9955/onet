@@ -4,15 +4,19 @@
  * Детская игра «Найди одинаковые» (memory):
  * все фигуры показываются, потом отсчёт 5 секунд — и карточки
  * переворачиваются рубашкой вверх. Нажатие разворачивает карточку;
- * если вторая открытая — такая же, обе «взрываются» (и появляется
- * название животного/фрукта), иначе первая возвращается рубашкой вверх.
+ * если вторая открытая — такая же, ОБЕ сначала показываются открытыми
+ * (успеваешь увидеть пару и название), и только потом «взрываются».
+ * Иначе первая возвращается рубашкой вверх.
  * Таймер считает время вверх — проиграть нельзя, сброса уровней нет.
+ *
+ * Карточки КВАДРАТНЫЕ — как в «соединялке»: фото зверей не обрезается,
+ * рубашка не срезается. Сетка подбирается под число карточек ТОЧНО
+ * (rows × cols = кол-во карточек): поле заполнено без пустых мест.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { IconClock, IconPause, IconSkip, IconSoundOff, IconSoundOn, IconStar } from './GameIcons';
+import { IconClock, IconExpand, IconPause, IconShrink, IconSkip, IconSoundOff, IconSoundOn, IconStar } from './GameIcons';
 import {
-  kidsKindsForLevel,
   pickKinds,
   themeForLevel,
   type KindSkin,
@@ -25,6 +29,7 @@ import {
   memoryPairsForLevel,
 } from '@/lib/onet/memory';
 import { sound } from '@/lib/onet/sound';
+import { useFullscreen } from '@/lib/onet/fullscreen';
 import type { Lang, UIStrings } from '@/lib/onet/i18n';
 
 export interface MemoryGameProps {
@@ -46,8 +51,9 @@ export interface MemoryGameProps {
 
 interface Pop {
   key: number;
-  row: number;
-  col: number;
+  /** позиция центра карточки, px внутри сетки */
+  left: number;
+  top: number;
   name: string;
   img?: string;
 }
@@ -66,6 +72,29 @@ function PopImg({ src }: { src: string }) {
     />
   );
 }
+
+/** Замер игровой области (под неё считается размер квадратных карточек) */
+function useElementSize<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) {
+        setSize({ w: e.contentRect.width, h: e.contentRect.height });
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, size] as const;
+}
+
+/** сколько секунд пара открыта, прежде чем улететь */
+const MATCH_REVEAL_MS = 900;
+/** зазор между карточками, px */
+const GAP = 8;
 
 export default function MemoryGame({
   level,
@@ -92,7 +121,25 @@ export default function MemoryGame({
     [pairs, theme]
   );
   const deck = useMemo(() => createMemoryDeck(pairs, kinds.length), [pairs, kinds.length]);
-  const grid = useMemo(() => memoryGridForCards(deck.length), [deck.length]);
+
+  const [areaRef, { w, h }] = useElementSize<HTMLDivElement>();
+  const areaAspect = w > 60 && h > 60 ? w / h : 1.4;
+  /* сетка ТОЧНО под колоду: rows × cols = deck.length, без пустых мест */
+  const grid = useMemo(() => memoryGridForCards(deck.length, areaAspect), [deck.length, areaAspect]);
+
+  /* квадратные карточки, как в соединялке: размер = min(по ширине, по высоте) */
+  const ready = w > 60 && h > 60;
+  const card = ready
+    ? Math.floor(
+        Math.min(
+          (w - (grid.cols - 1) * GAP) / grid.cols,
+          (h - (grid.rows - 1) * GAP) / grid.rows
+        )
+      )
+    : 0;
+  const boxW = card > 0 ? grid.cols * card + (grid.cols - 1) * GAP : 0;
+  const boxH = card > 0 ? grid.rows * card + (grid.rows - 1) * GAP : 0;
+  const pitch = card + GAP;
 
   const [previewLeft, setPreviewLeft] = useState(MEMORY_PREVIEW_SEC);
   const [flipped, setFlipped] = useState<number[]>([]);
@@ -104,6 +151,8 @@ export default function MemoryGame({
   const [pops, setPops] = useState<Pop[]>([]);
   const winCalledRef = useRef(false);
   const timersRef = useRef<number[]>([]);
+  /* полноэкранный режим: кнопка-стрелки рядом с паузой */
+  const fs = useFullscreen();
 
   const inPreview = previewLeft > 0;
   const blocked = paused || adBusy || lock || inPreview;
@@ -135,10 +184,11 @@ export default function MemoryGame({
 
   const pushPop = useCallback(
     (cardIdx: number, skin: KindSkin) => {
+      if (card <= 0) return;
       const pop: Pop = {
         key: Date.now() + cardIdx,
-        row: Math.floor(cardIdx / grid.cols),
-        col: cardIdx % grid.cols,
+        left: (cardIdx % grid.cols) * pitch + card / 2,
+        top: Math.floor(cardIdx / grid.cols) * pitch + 4,
         name: lang === 'en' ? skin.en : skin.ru,
         img: skin.img,
       };
@@ -149,17 +199,17 @@ export default function MemoryGame({
       }, 2600);
       timersRef.current.push(id);
     },
-    [grid.cols, lang]
+    [card, grid.cols, pitch, lang]
   );
 
   const handleClick = useCallback(
     (idx: number) => {
       if (blocked || winCalledRef.current) return;
-      const card = deck[idx];
-      if (matched.includes(card.id) || flipped.includes(card.id)) return;
+      const cardData = deck[idx];
+      if (matched.includes(cardData.id) || flipped.includes(cardData.id)) return;
 
       if (flipped.length === 0) {
-        setFlipped([card.id]);
+        setFlipped([cardData.id]);
         sound.play('select');
         return;
       }
@@ -169,26 +219,35 @@ export default function MemoryGame({
       const first = deck.find((c) => c.id === firstId);
       if (!first) return;
 
-      if (first.kind === card.kind) {
-        /* ПАРА: обе взрываются + название */
-        const newCombo = combo + 1;
-        const gained = 10 + Math.min(newCombo - 1, 4) * 5;
-        const newMatched = [...matched, firstId, card.id];
-        setMatched(newMatched);
-        setFlipped([]);
-        setCombo(newCombo);
-        setScore((s) => s + gained);
-        sound.play(newCombo >= 3 ? 'combo' : 'match');
-        pushPop(idx, kinds[card.kind]);
+      if (first.kind === cardData.kind) {
+        /* ПАРА: обе карточки СНАЧАЛА открываются… */
+        setFlipped([firstId, cardData.id]);
+        setLock(true);
+        sound.play('select');
+        pushPop(idx, kinds[cardData.kind]);
 
-        if (newMatched.length === deck.length) {
-          winCalledRef.current = true;
-          const id = window.setTimeout(() => onWin(score + gained, elapsed), 900);
-          timersRef.current.push(id);
-        }
+        const id = window.setTimeout(() => {
+          /* …и только потом улетают (взрыв + очки) */
+          const newCombo = combo + 1;
+          const gained = 10 + Math.min(newCombo - 1, 4) * 5;
+          const newMatched = [...matched, firstId, cardData.id];
+          setMatched(newMatched);
+          setFlipped([]);
+          setLock(false);
+          setCombo(newCombo);
+          setScore((s) => s + gained);
+          sound.play(newCombo >= 3 ? 'combo' : 'match');
+
+          if (newMatched.length === deck.length) {
+            winCalledRef.current = true;
+            const winId = window.setTimeout(() => onWin(score + gained, elapsed), 900);
+            timersRef.current.push(winId);
+          }
+        }, MATCH_REVEAL_MS);
+        timersRef.current.push(id);
       } else {
-        /* разные: первая возвращается рубашкой вверх */
-        setFlipped([firstId, card.id]);
+        /* разные: обе открыты, потом первая возвращается рубашкой вверх */
+        setFlipped([firstId, cardData.id]);
         setLock(true);
         setCombo(0);
         sound.play('wrong');
@@ -269,6 +328,17 @@ export default function MemoryGame({
           >
             {soundOn ? <IconSoundOn className="h-6 w-6" /> : <IconSoundOff className="h-6 w-6" />}
           </button>
+          {fs.supported && (
+            <button
+              type="button"
+              onClick={fs.toggle}
+              aria-label={fs.isFullscreen ? t.fullscreenOff : t.fullscreenOn}
+              title={fs.isFullscreen ? t.fullscreenOff : t.fullscreenOn}
+              className="game-action-btn game-action-btn--sm game-action-btn--sound"
+            >
+              {fs.isFullscreen ? <IconShrink className="h-6 w-6" /> : <IconExpand className="h-6 w-6" />}
+            </button>
+          )}
           <button
             type="button"
             onClick={onPause}
@@ -281,78 +351,77 @@ export default function MemoryGame({
         </div>
       </header>
 
-      {/* Поле memory */}
+      {/* Поле memory: квадратные карточки, сетка точно под колоду */}
       <main className="relative flex min-h-0 flex-1 items-center justify-center p-2">
         <div
-          className="relative flex h-full w-full items-center justify-center"
+          ref={areaRef}
+          className="flex h-full w-full items-center justify-center"
           role="grid"
           aria-label={t.memoryTitle}
         >
-          <div
-            className="mem-grid"
-            style={{
-              gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`,
-              gridTemplateRows: `repeat(${grid.rows}, minmax(0, 1fr))`,
-            }}
-          >
-            {deck.map((card, idx) => {
-              const up = faceUp(idx);
-              const isMatched = matched.includes(card.id);
-              const skin = kinds[card.kind];
-              return (
-                <button
-                  key={card.id}
-                  type="button"
-                  onClick={() => handleClick(idx)}
-                  aria-label={up ? skin?.ru ?? '' : 'Карточка'}
-                  className={
-                    'mem-card' + (up ? ' mem-card--up' : '') + (isMatched ? ' mem-card--matched' : '')
-                  }
-                >
-                  <div className="mem-card-inner">
-                    {/* рубашка — красивая детская картинка (отдельный ассет) */}
-                    <div className="mem-face mem-back">
-                      <img src="/tiles/card-back.webp" alt="" draggable={false} />
-                    </div>
-                    {/* лицо: реалистичная картинка */}
-                    <div
-                      className="mem-face mem-front"
-                      style={
-                        { '--tile-bg': skin?.bg, '--tile-ring': skin?.ring } as React.CSSProperties
+          {card > 20 && (
+            <div className="relative" style={{ width: boxW, height: boxH }}>
+              <div
+                className="mem-grid"
+                style={{
+                  gridTemplateColumns: `repeat(${grid.cols}, ${card}px)`,
+                  gridTemplateRows: `repeat(${grid.rows}, ${card}px)`,
+                  gap: `${GAP}px`,
+                }}
+              >
+                {deck.map((cardData, idx) => {
+                  const up = faceUp(idx);
+                  const isMatched = matched.includes(cardData.id);
+                  const skin = kinds[cardData.kind];
+                  return (
+                    <button
+                      key={cardData.id}
+                      type="button"
+                      onClick={() => handleClick(idx)}
+                      aria-label={up ? skin?.ru ?? '' : 'Карточка'}
+                      className={
+                        'mem-card' + (up ? ' mem-card--up' : '') + (isMatched ? ' mem-card--matched' : '')
                       }
                     >
-                      {skin?.img ? (
-                        <img src={skin.img} alt="" draggable={false} loading="lazy" />
-                      ) : (
-                        <span>{skin?.e}</span>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                      <div className="mem-card-inner">
+                        {/* рубашка — красивая детская картинка (отдельный ассет) */}
+                        <div className="mem-face mem-back">
+                          <img src="/tiles/card-back.webp" alt="" draggable={false} />
+                        </div>
+                        {/* лицо: реалистичная картинка */}
+                        <div
+                          className="mem-face mem-front"
+                          style={
+                            { '--tile-bg': skin?.bg, '--tile-ring': skin?.ring } as React.CSSProperties
+                          }
+                        >
+                          {skin?.img ? (
+                            <img src={skin.img} alt="" draggable={false} loading="lazy" />
+                          ) : (
+                            <span>{skin?.e}</span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
 
-          {/* всплывающие названия («кто это») — крупно и подолгу */}
-          {pops.map((p) => (
-            <div
-              key={p.key}
-              className="tile-name-pop"
-              style={{
-                left: `${((p.col + 0.5) / grid.cols) * 100}%`,
-                top: `${((p.row + 0.5) / grid.rows) * 100 - 4}%`,
-              }}
-            >
-              {p.img && <PopImg src={p.img} />}
-              <span>{p.name}</span>
-            </div>
-          ))}
+              {/* всплывающие названия («кто это») — крупно и подолгу */}
+              {pops.map((p) => (
+                <div key={p.key} className="tile-name-pop" style={{ left: p.left, top: p.top }}>
+                  {p.img && <PopImg src={p.img} />}
+                  <span>{p.name}</span>
+                </div>
+              ))}
 
-          {/* предпросмотр: «Запоминай! N…» */}
-          {inPreview && (
-            <div className="mem-preview" role="status" aria-live="polite">
-              <span>{t.memoryPreview}</span>
-              <span className="mem-preview-count">{t.memoryPreviewLeft(previewLeft)}</span>
+              {/* предпросмотр: «Запоминай! N…» */}
+              {inPreview && (
+                <div className="mem-preview" role="status" aria-live="polite">
+                  <span>{t.memoryPreview}</span>
+                  <span className="mem-preview-count">{t.memoryPreviewLeft(previewLeft)}</span>
+                </div>
+              )}
             </div>
           )}
         </div>

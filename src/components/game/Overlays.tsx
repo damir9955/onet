@@ -18,6 +18,7 @@ import {
   IconCards,
   IconClock,
   IconDoor,
+  IconExpand,
   IconFire,
   IconFlag,
   IconGear,
@@ -30,6 +31,7 @@ import {
   IconParty,
   IconPlay,
   IconRefresh,
+  IconShrink,
   IconShuffle,
   IconFreeze,
   IconSkip,
@@ -40,6 +42,7 @@ import {
   IconX,
   type GameIconProps,
 } from './GameIcons';
+import { useFullscreen } from '@/lib/onet/fullscreen';
 
 /* ============ Общие типы ============ */
 
@@ -117,22 +120,6 @@ function ModeThumbs({ names }: { names: string[] }) {
   );
 }
 
-/** чип статистики меню: тематическая иконка + значение */
-function StatChip({
-  icon: Icon,
-  children,
-}: {
-  icon: React.ComponentType<GameIconProps>;
-  children: React.ReactNode;
-}) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/75 px-2.5 py-1 text-xs font-black text-teal-900/85 ring-1 ring-white/60">
-      <Icon className="h-4 w-4" />
-      {children}
-    </span>
-  );
-}
-
 export function MenuScreen({
   t,
   lang,
@@ -159,6 +146,8 @@ export function MenuScreen({
   const [view, setView] = useState<'main' | 'kids'>('main');
   /* настройки живут в отдельном окне — не мешают глазам в меню */
   const [showSettings, setShowSettings] = useState(false);
+  /* полноэкранный режим: убирает браузерную панель — игра на весь экран */
+  const fs = useFullscreen();
 
   return (
     <div className="relative flex h-full w-full flex-col items-center justify-center overflow-y-auto p-4 text-center">
@@ -168,14 +157,18 @@ export function MenuScreen({
         <div className="menu-bg-veil" />
       </div>
 
-      <button
-        type="button"
-        onClick={onToggleSound}
-        aria-label={soundOn ? t.soundOn : t.soundOff}
-        className="absolute right-4 top-4 z-10 mt-[env(safe-area-inset-top)] flex h-11 w-11 items-center justify-center rounded-full bg-white/85 text-teal-800 shadow-md transition hover:scale-105 active:scale-95"
-      >
-        {soundOn ? <IconSoundOn className="h-5 w-5" /> : <IconSoundOff className="h-5 w-5" />}
-      </button>
+      {/* Полноэкранный режим: одна кнопка в углу, убирает лишние панели */}
+      {fs.supported && (
+        <button
+          type="button"
+          onClick={fs.toggle}
+          aria-label={fs.isFullscreen ? t.fullscreenOff : t.fullscreenOn}
+          title={fs.isFullscreen ? t.fullscreenOff : t.fullscreenOn}
+          className="game-action-btn game-action-btn--sm game-action-btn--sound absolute left-4 top-4 z-10 mt-[env(safe-area-inset-top)]"
+        >
+          {fs.isFullscreen ? <IconShrink className="h-6 w-6" /> : <IconExpand className="h-6 w-6" />}
+        </button>
+      )}
 
       {/* Заголовок: ярлык игры + название */}
       <div className="relative z-[1] flex items-center gap-4">
@@ -194,9 +187,6 @@ export function MenuScreen({
           <p className="text-lg font-black text-teal-700/90 xl:text-xl">{t.gameSubtitle}</p>
         </div>
       </div>
-      <p className="relative z-[1] mt-1 max-w-md text-sm font-semibold text-teal-900/70">
-        {t.tagline}
-      </p>
 
       {view === 'main' ? (
         <div className="relative z-[1] mt-4 flex w-full max-w-lg flex-col gap-3">
@@ -229,7 +219,8 @@ export function MenuScreen({
             <IconArrowRight className="h-6 w-6 shrink-0 text-amber-500/70" />
           </button>
 
-          {/* Вторичные действия: таблица, настройки, новая игра */}
+          {/* Вторичные действия: таблица и настройки (всё остальное —
+              внутри настроек, чтобы меню было простым и понятным) */}
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={onShowLeaderboard} className="menu-pill menu-pill--amber">
               <IconTrophy className="h-4 w-4" /> {t.leaderboard}
@@ -241,26 +232,6 @@ export function MenuScreen({
             >
               <IconGear className="h-4 w-4" /> {t.settings}
             </button>
-            {!fresh && (
-              <button
-                type="button"
-                onClick={() => setConfirmNew(true)}
-                className="menu-pill menu-pill--rose"
-              >
-                <IconRefresh className="h-4 w-4" /> {t.newGame}
-              </button>
-            )}
-          </div>
-
-          {/* Статистика: очки, бонусы, серия — тематическими иконками */}
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <StatChip icon={IconStar}>{totalScore}</StatChip>
-            <StatChip icon={IconHint}>{bonuses.hint}</StatChip>
-            <StatChip icon={IconShuffle}>{bonuses.shuffle}</StatChip>
-            <StatChip icon={IconFreeze}>{bonuses.freeze}</StatChip>
-            {maxStreak > 0 && (
-              <StatChip icon={IconFire}>{t.streakLine(streak, maxStreak)}</StatChip>
-            )}
           </div>
         </div>
       ) : (
@@ -302,16 +273,16 @@ export function MenuScreen({
             <IconArrowRight className="h-6 w-6 shrink-0 text-sky-500/70" />
           </button>
 
-          {/* Сложность: Проще / Посложнее */}
-          <div className="flex items-center justify-between rounded-2xl bg-white/75 px-4 py-2.5 ring-1 ring-white/60">
-            <span className="text-sm font-bold text-teal-900/70">{t.difficulty}</span>
-            <div className="flex overflow-hidden rounded-full bg-teal-100 p-0.5">
+          {/* Сложность: Проще / Посложнее — заметная панель (не сливается с фоном) */}
+          <div className="flex items-center justify-between rounded-2xl border-2 border-amber-300/80 bg-white px-4 py-2.5 shadow-lg shadow-amber-900/10">
+            <span className="text-sm font-black text-teal-900">{t.difficulty}</span>
+            <div className="flex overflow-hidden rounded-full bg-amber-100 p-0.5 ring-1 ring-amber-200">
               <button
                 type="button"
                 onClick={() => onKidsDifficulty(false)}
                 className={
                   'rounded-full px-3 py-1 text-sm font-black transition ' +
-                  (!kidsHarder ? 'bg-amber-500 text-white shadow' : 'text-teal-800/70 hover:bg-teal-50')
+                  (!kidsHarder ? 'bg-amber-500 text-white shadow' : 'text-teal-800/70 hover:bg-amber-50')
                 }
               >
                 {t.easier}
@@ -321,7 +292,7 @@ export function MenuScreen({
                 onClick={() => onKidsDifficulty(true)}
                 className={
                   'rounded-full px-3 py-1 text-sm font-black transition ' +
-                  (kidsHarder ? 'bg-amber-500 text-white shadow' : 'text-teal-800/70 hover:bg-teal-50')
+                  (kidsHarder ? 'bg-amber-500 text-white shadow' : 'text-teal-800/70 hover:bg-amber-50')
                 }
               >
                 {t.harder}
@@ -331,7 +302,7 @@ export function MenuScreen({
         </div>
       )}
 
-      {/* Настройки — отдельное окно (язык и звук не мешают в меню) */}
+      {/* Настройки — отдельное окно (язык, звук и сброс не мешают в меню) */}
       {showSettings && (
         <SettingsModal
           t={t}
@@ -339,6 +310,11 @@ export function MenuScreen({
           soundOn={soundOn}
           onLangChange={onLangChange}
           onToggleSound={onToggleSound}
+          showReset={!fresh}
+          onRequestNewGame={() => {
+            setShowSettings(false);
+            setConfirmNew(true);
+          }}
           onClose={() => setShowSettings(false)}
         />
       )}
@@ -380,6 +356,10 @@ export interface SettingsModalProps {
   soundOn: boolean;
   onLangChange: (lang: Lang) => void;
   onToggleSound: () => void;
+  /** показывать кнопку «Новая игра» (есть что сбрасывать) */
+  showReset?: boolean;
+  /** запрос сброса прогресса (открывает подтверждение) */
+  onRequestNewGame?: () => void;
   onClose: () => void;
 }
 
@@ -389,6 +369,8 @@ export function SettingsModal({
   soundOn,
   onLangChange,
   onToggleSound,
+  showReset,
+  onRequestNewGame,
   onClose,
 }: SettingsModalProps) {
   return (
@@ -450,6 +432,23 @@ export function SettingsModal({
           />
         </button>
       </div>
+
+      {/* Новая игра (сброс прогресса) — редко нужна, живёт тут, чтобы
+          главное меню оставалось простым */}
+      {showReset && onRequestNewGame && (
+        <button
+          type="button"
+          onClick={onRequestNewGame}
+          className="mt-4 flex w-full items-center justify-between rounded-2xl bg-rose-50/80 px-4 py-3 ring-1 ring-rose-200 transition hover:bg-rose-100/80 active:scale-95"
+        >
+          <span className="flex items-center gap-1.5 text-sm font-bold text-rose-700">
+            <IconRefresh className="h-5 w-5" /> {t.newGame}
+          </span>
+          <span className="rounded-full bg-rose-500 px-3 py-1 text-xs font-black text-white shadow">
+            {t.startOver}
+          </span>
+        </button>
+      )}
 
       <Button
         onClick={onClose}
@@ -575,6 +574,48 @@ export function ExitConfirmModal({ t, resetLevel, onConfirm, onCancel }: ExitCon
           className="h-11 w-full rounded-full border-teal-200 text-sm font-bold text-teal-800 hover:bg-teal-50 active:scale-95"
         >
           {t.stay}
+        </Button>
+      </div>
+    </ModalShell>
+  );
+}
+
+/* ============ Пропуск уровня: сначала спросить («смотреть рекламу и
+   пропустить?»), рекламу не запускать сразу ============ */
+
+export interface SkipConfirmModalProps {
+  t: UIStrings;
+  /** текущий уровень — после пропуска начнётся следующий */
+  level: number;
+  onWatch: () => void;
+  onClose: () => void;
+}
+
+export function SkipConfirmModal({ t, level, onWatch, onClose }: SkipConfirmModalProps) {
+  return (
+    <ModalShell>
+      <div className="flex justify-center" aria-hidden="true">
+        <span className="relative flex h-14 w-14 items-center justify-center">
+          <IconSkip className="absolute h-14 w-14 opacity-25" />
+          <IconSkip className="relative h-10 w-10" />
+        </span>
+      </div>
+      <h2 className="mt-2 text-xl font-black text-teal-900">{t.skipConfirmTitle}</h2>
+      <p className="mt-2 text-sm font-semibold text-teal-900/70">{t.skipConfirmBody(level + 1)}</p>
+      <div className="mt-5 flex flex-col gap-2.5">
+        <button
+          type="button"
+          onClick={onWatch}
+          className="flex h-12 w-full items-center justify-center gap-2.5 rounded-full bg-gradient-to-b from-amber-400 to-amber-500 px-6 text-base font-black text-white shadow-lg shadow-amber-500/40 ring-2 ring-amber-300 transition hover:brightness-105 active:scale-95"
+        >
+          <IconAd className="h-5 w-5" /> {t.watchAdSkip}
+        </button>
+        <Button
+          onClick={onClose}
+          variant="outline"
+          className="h-11 w-full rounded-full border-teal-200 text-sm font-bold text-teal-800 hover:bg-teal-50 active:scale-95"
+        >
+          {t.cancel}
         </Button>
       </div>
     </ModalShell>
