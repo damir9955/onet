@@ -36,6 +36,7 @@ import {
   IconSoundOff,
   IconSoundOn,
   IconStar,
+  IconTap,
   IconTrophy,
   IconX,
   type GameIconProps,
@@ -92,6 +93,7 @@ export interface MenuScreenProps {
   onShowLeaderboard: () => void;
   onKidsOnet: () => void;
   onKidsMemory: () => void;
+  onKidsToddler: () => void;
   onKidsDifficulty: (harder: boolean) => void;
 }
 
@@ -135,6 +137,7 @@ export function MenuScreen({
   onShowLeaderboard,
   onKidsOnet,
   onKidsMemory,
+  onKidsToddler,
   onKidsDifficulty,
 }: MenuScreenProps) {
   const fresh = level <= 1 && totalScore === 0;
@@ -253,6 +256,21 @@ export function MenuScreen({
               </span>
             </span>
             <IconArrowRight className="h-6 w-6 shrink-0 text-sky-500/70" />
+          </button>
+
+          {/* Тыкай пары — для самых маленьких: без времени, всё открыто */}
+          <button type="button" onClick={onKidsToddler} className="mode-card mode-card--kids">
+            <ModeThumbs names={['bear', 'duck', 'grapes']} />
+            <span className="min-w-0 flex-1 text-left">
+              <span className="flex items-center gap-1.5 text-lg font-black text-teal-900">
+                <IconTap className="h-6 w-6" /> {t.toddlerTitle}
+              </span>
+              <span className="mode-card-desc">{t.toddlerDesc}</span>
+              <span className="block text-sm font-black text-rose-700">
+                {t.continueKids(kidsLevel)}
+              </span>
+            </span>
+            <IconArrowRight className="h-6 w-6 shrink-0 text-rose-500/70" />
           </button>
 
           {/* Сложность: Проще / Посложнее — заметная панель (не сливается с фоном) */}
@@ -615,7 +633,8 @@ export interface WinInfo {
   earned: Bonuses;
   /** как продолжить после победы (детский режим) */
   mode?: 'classic' | 'kids';
-  kidsGame?: 'onet' | 'memory';
+  /** toddler сюда не попадает: у него авто-переход без модалки */
+  kidsGame?: 'onet' | 'memory' | 'toddler';
 }
 
 export interface WinModalProps {

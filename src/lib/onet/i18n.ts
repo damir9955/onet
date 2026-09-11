@@ -67,6 +67,10 @@ export interface UIStrings {
   kidsOnetDesc: string;
   memoryTitle: string;
   memoryDesc: string;
+  /* v1.5.0: режим «для самых маленьких» — тыкай пары */
+  toddlerTitle: string;
+  toddlerDesc: string;
+  toddlerYay: string;
   difficulty: string;
   easier: string;
   harder: string;
@@ -189,6 +193,9 @@ const RU: UIStrings = {
   kidsOnetDesc: 'Соединяй одинаковые картинки линиями',
   memoryTitle: 'Найди одинаковые',
   memoryDesc: 'Запомни карточки и найди пары',
+  toddlerTitle: 'Тыкай пары',
+  toddlerDesc: 'Для самых маленьких: без времени, всё открыто — просто тыкай одинаковые',
+  toddlerYay: 'Молодец!',
   difficulty: 'Сложность',
   easier: 'Проще',
   harder: 'Посложнее',
@@ -319,6 +326,9 @@ const EN: UIStrings = {
   kidsOnetDesc: 'Link two identical pictures with a line',
   memoryTitle: 'Find the same',
   memoryDesc: 'Memorize the cards and find the pairs',
+  toddlerTitle: 'Tap the pairs',
+  toddlerDesc: 'For the littlest ones: no timer, all cards open — just tap the matching ones',
+  toddlerYay: 'Well done!',
   difficulty: 'Difficulty',
   easier: 'Easier',
   harder: 'Harder',

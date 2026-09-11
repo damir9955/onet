@@ -354,6 +354,29 @@ export function IconCards({ className }: GameIconProps) {
   );
 }
 
+/** «Тыкай пары» (для самых маленьких) — пальчик касается карточки */
+export function IconTap({ className }: GameIconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="2.6" y="2.8" width="9" height="9" rx="2.2" fill="#fbbf24" stroke="#d97706" strokeWidth="1.6" />
+      <rect x="12.4" y="2.8" width="9" height="9" rx="2.2" fill="#34d399" stroke="#059669" strokeWidth="1.6" />
+      <circle cx="7.1" cy="7.3" r="1.5" fill="#f472b6" />
+      <circle cx="16.9" cy="7.3" r="1.5" fill="#f472b6" />
+      {/* пальчик: указательный тыкает вниз в правую карточку */}
+      <path
+        d="M13.2 20.8c-1.6-.6-2.6-1.9-2.7-3.6l-.2-3.1c0-.9.7-1.6 1.6-1.6.7 0 1.3.4 1.5 1.1l.3.9V6.9c0-1 .8-1.8 1.8-1.8s1.8.8 1.8 1.8v5.6l.7-.9c.4-.5 1.1-.7 1.7-.5.7.2 1.2.9 1.2 1.6v2.8c0 2.6-1.5 4.9-3.9 5.8l-.2.1h-2.6z"
+        fill="#fde68a"
+        stroke="#b45309"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      {/* волны тыка */}
+      <path d="M20.6 9.6c.9.6 1.5 1.6 1.6 2.7" fill="none" stroke="#38bdf8" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M21.8 7.2c1.5 1 2.5 2.7 2.6 4.5" fill="none" stroke="#38bdf8" strokeWidth="1.7" strokeLinecap="round" opacity="0.75" />
+    </Svg>
+  );
+}
+
 /** Турнирная таблица — кубок */
 export function IconTrophy({ className }: GameIconProps) {
   return (

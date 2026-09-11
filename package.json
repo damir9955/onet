@@ -1,6 +1,6 @@
 {
   "name": "klik-klak",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "private": true,
   "description": "Клик-Клак: Соедини пары — игра ONET с классикой и детским режимом",
   "scripts": {

@@ -33,6 +33,7 @@ import { sound } from '@/lib/onet/sound';
 import { showRewardedAd, type RewardedResult } from '@/lib/ads/yandex';
 import Board, { type DyingTile, type NamePopup } from './Board';
 import MemoryGame from './MemoryGame';
+import ToddlerGame from './ToddlerGame';
 import TimeBar from './TimeBar';
 import {
   AdOfferModal,
@@ -209,8 +210,8 @@ function pushLeaderboard(
 
 /** игровой режим сессии */
 export type GameMode = 'classic' | 'kids';
-/** какая детская игра активна */
-export type KidsGame = 'onet' | 'memory';
+/** какая детская игра активна (toddler — «тыкай пары» для самых маленьких) */
+export type KidsGame = 'onet' | 'memory' | 'toddler';
 
 type Phase =
   | 'menu'
@@ -307,6 +308,17 @@ export default function OnetGame() {
     document.documentElement.lang = progress.lang;
   }, [progress.lang]);
 
+  /* Service Worker: оболочка игры кладётся в кеш — установленное
+     приложение открывается МГНЕННО (и работает без сети). Только
+     продакшн: в dev-сервере SW ломает горячую перезагрузку. */
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') return;
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* нет HTTPS / приватный режим — просто играем без кеша */
+    });
+  }, []);
+
   /* Таймер на "дедлайне": endsAtRef — момент окончания времени.
      Пауза, заморозка и РЕКЛАМА двигают метку, интервал лишь отображает. */
   const endsAtRef = useRef(0);
@@ -381,8 +393,8 @@ export default function OnetGame() {
   /* ============ Таймер: полоса времени непрерывно убывает ============ */
 
   useEffect(() => {
-    /* у memory-игры нет лимита времени — таймер не нужен */
-    if (phase !== 'playing' || sessionRef.current?.kidsGame === 'memory') return;
+    /* у memory- и toddler-игр нет лимита времени — таймер не нужен */
+    if (phase !== 'playing' || sessionRef.current?.kidsGame === 'memory' || sessionRef.current?.kidsGame === 'toddler') return;
     lastRunRef2.current = Date.now();
     const iv = window.setInterval(() => {
       const now = Date.now();
@@ -588,6 +600,44 @@ export default function OnetGame() {
     [clearTransient, trackTimer]
   );
 
+  /* Toddler-игра («тыкай пары» для самых маленьких): всё открыто,
+     времени нет, уровни бесконечные и переключаются САМИ */
+  const startToddlerNow = useCallback(
+    (level: number) => {
+      clearTransient();
+      pausedAtRef.current = 0;
+      freezeUntilRef.current = 0;
+      frozenLeftRef.current = 0;
+      setFrozenLeft(0);
+      finishedRef.current = false;
+      totalRef.current = 0;
+      endsAtRef.current = Infinity;
+      timeLeftRef.current = 0;
+      setSession({
+        mode: 'kids',
+        kidsGame: 'toddler',
+        level,
+        board: [],
+        rows: 0,
+        cols: 0,
+        kinds: [],
+        timeTotal: 0,
+        score: 0,
+        combo: 0,
+        lastMatchAt: 0,
+        pairsLeft: 0,
+        gravity: 'none',
+        easy: false,
+        theme: themeForLevel(level),
+      });
+      setBanner(level);
+      setPhase('playing');
+      const id = window.setTimeout(() => setBanner(null), BANNER_MS + 60);
+      trackTimer(id);
+    },
+    [clearTransient, trackTimer]
+  );
+
   /* Запуск: показываем каркас и ждём первого измерения области поля */
   const beginLevel = useCallback(
     (level: number, mode: GameMode = 'classic', kidsGame: KidsGame = 'onet') => {
@@ -599,10 +649,11 @@ export default function OnetGame() {
       setPendingLevel(level);
       pendingLevelRef.current = level;
       pendingModeRef.current = { mode, kidsGame };
-      /* memory стартует без измерения области */
-      if (mode === 'kids' && kidsGame === 'memory') {
+      /* memory и toddler стартуют без измерения области */
+      if (mode === 'kids' && (kidsGame === 'memory' || kidsGame === 'toddler')) {
         pendingLevelRef.current = null;
-        startMemoryNow(level);
+        if (kidsGame === 'toddler') startToddlerNow(level);
+        else startMemoryNow(level);
         return;
       }
       /* страховка: если измерение не придёт — строим по окну (landscape-логика) */
@@ -623,7 +674,7 @@ export default function OnetGame() {
       }, 600);
       setPhase('starting');
     },
-    [clearTransient, startLevelNow, startMemoryNow]
+    [clearTransient, startLevelNow, startMemoryNow, startToddlerNow]
   );
 
   /* Измерение области поля: срабатывает и на первый монтаж, и на resize
@@ -679,6 +730,13 @@ export default function OnetGame() {
     sound.ensure();
     sound.play('click');
     beginLevel(progressRef.current.kidsLevel, 'kids', 'memory');
+  }, [beginLevel]);
+
+  /** Детский режим: «Тыкай пары» (для самых маленьких) */
+  const handleKidsToddler = useCallback(() => {
+    sound.ensure();
+    sound.play('click');
+    beginLevel(progressRef.current.kidsLevel, 'kids', 'toddler');
   }, [beginLevel]);
 
   /** Детская сложность: «проще» / «посложнее» */
@@ -847,6 +905,20 @@ export default function OnetGame() {
     [finishWinKids]
   );
 
+  /* Toddler-победа: салют уже показал ToddlerGame — сразу следующий
+     уровень, БЕЗ модалки и подтверждений (уровни бесконечные, лёгкие) */
+  const handleToddlerWin = useCallback(
+    (finishedLevel: number) => {
+      const p0 = progressRef.current;
+      const np: Progress = { ...p0, kidsLevel: Math.max(p0.kidsLevel, finishedLevel + 1) };
+      progressRef.current = np;
+      setProgress(np);
+      saveProgress(np);
+      beginLevel(finishedLevel + 1, 'kids', 'toddler');
+    },
+    [beginLevel]
+  );
+
   const doShuffle = useCallback(
     (board: Cell[], rows: number, cols: number, message: string) => {
       const shuffled = shuffleBoard(board, rows, cols);
@@ -876,8 +948,10 @@ export default function OnetGame() {
         sound.play('select');
         return;
       }
+      /* повторный тык в ту же плитку: выделение НЕ снимается —
+         игрок уже выбрал, пусть выбор остаётся */
       if (selected.r === r && selected.c === c) {
-        setSelected(null);
+        sound.play('select');
         return;
       }
 
@@ -887,6 +961,8 @@ export default function OnetGame() {
         setSelected({ r, c });
         return;
       }
+
+      const isKidsMode = session.mode === 'kids';
 
       if (selTile.kind === tile.kind) {
         const path = findPath(session.board, session.rows, session.cols, selected, { r, c });
@@ -967,11 +1043,12 @@ export default function OnetGame() {
             trackTimer(idSh);
           }
         } else {
-          /* одинаковые, но путь заблокирован */
+          /* одинаковые, но путь заблокирован: красный миг — и ВТОРАЯ
+             плитка становится выбранной (тыкать заново не нужно) */
           setWrongPair([selected, { r, c }]);
           const id = window.setTimeout(() => setWrongPair(null), 420);
           trackTimer(id);
-          setSelected(null);
+          setSelected({ r, c });
           setSession((s) => (s ? { ...s, combo: 0 } : s));
           if (freezeUntilRef.current <= Date.now()) {
             endsAtRef.current = Math.max(Date.now(), endsAtRef.current - WRONG_PENALTY_SEC * 1000);
@@ -979,9 +1056,15 @@ export default function OnetGame() {
           sound.play('wrong');
         }
       } else {
-        /* другая картинка — переносим выбор */
+        /* другая картинка: в ДЕТСКОМ режиме — красный миг обеих, чтобы
+           было видно «это не пара»; выбор всегда переходит на вторую */
+        if (isKidsMode) {
+          setWrongPair([selected, { r, c }]);
+          const id = window.setTimeout(() => setWrongPair(null), 420);
+          trackTimer(id);
+        }
         setSelected({ r, c });
-        sound.play('select');
+        sound.play(isKidsMode ? 'wrong' : 'select');
       }
     },
     [phase, session, selected, finishWin, doShuffle, trackTimer]
@@ -1231,6 +1314,7 @@ export default function OnetGame() {
   const showGame = inGameShell;
   const bonuses = progress.bonuses;
   const isMemory = !!session && session.mode === 'kids' && session.kidsGame === 'memory';
+  const isToddler = !!session && session.mode === 'kids' && session.kidsGame === 'toddler';
   const isKids = !!session && session.mode === 'kids';
   const comboActive =
     !!session &&
@@ -1243,7 +1327,7 @@ export default function OnetGame() {
   const cpIsNow = isCheckpointLevel(headerLevel);
   const cpUntil = CHECKPOINT_EVERY - (headerLevel % CHECKPOINT_EVERY);
   const showCpChip =
-    !isMemory && (session ? session.mode === 'classic' : pendingModeRef.current.mode === 'classic');
+    !isMemory && !isToddler && (session ? session.mode === 'classic' : pendingModeRef.current.mode === 'classic');
   /* победу на уровне-чекпоинте отмечаем «прогресс сохранён» */
   const winSaved = !!winInfo && winInfo.mode !== 'kids' && isCheckpointLevel(winInfo.level);
 
@@ -1264,8 +1348,8 @@ export default function OnetGame() {
       <div className="h-full w-full overflow-hidden text-teal-950">
       {showGame ? (
         <div className="flex h-full select-none flex-col">
-          {/* Верхняя панель (кроме memory — у неё своя): всё в ОДИН ряд */}
-          {!isMemory && (
+          {/* Верхняя панель (кроме memory и toddler — у них своя): всё в ОДИН ряд */}
+          {!isMemory && !isToddler && (
           <header className="px-2 pt-[max(0.375rem,env(safe-area-inset-top))]">
             <div className="flex items-center gap-2">
               <span
@@ -1393,11 +1477,11 @@ export default function OnetGame() {
                 kids={isKids}
                 theme={session?.theme}
                 checkpoint={!isKids && isCheckpointLevel(banner)}
-                low={isMemory}
+                low={isMemory || isToddler}
               />
             )}
             {toast && <Toast message={toast} />}
-            {comboActive && session && !isMemory && (
+            {comboActive && session && !isMemory && !isToddler && (
               <div className="pointer-events-none absolute left-2 top-2 z-30">
                 <ComboChip combo={session.combo} />
               </div>
@@ -1419,7 +1503,20 @@ export default function OnetGame() {
                 onToggleSound={handleToggleSound}
               />
             )}
-            {session && !isMemory && (
+            {session && isToddler && (
+              <ToddlerGame
+                key={session.level}
+                level={session.level}
+                t={t}
+                lang={progress.lang}
+                soundOn={sound.enabled}
+                paused={phase !== 'playing'}
+                onNext={handleToddlerWin}
+                onPause={pauseGame}
+                onToggleSound={handleToggleSound}
+              />
+            )}
+            {session && !isMemory && !isToddler && (
               <Board
                 board={session.board}
                 rows={session.rows}
@@ -1456,6 +1553,7 @@ export default function OnetGame() {
           onShowLeaderboard={() => setShowLeaderboard(true)}
           onKidsOnet={handleKidsOnet}
           onKidsMemory={handleKidsMemory}
+          onKidsToddler={handleKidsToddler}
           onKidsDifficulty={handleKidsDifficulty}
         />
       )}
@@ -1467,7 +1565,7 @@ export default function OnetGame() {
           level={session.level}
           onResume={resumeGame}
           onMenu={requestExit}
-          onSkipLevel={isKids ? () => setSkipOffer(true) : undefined}
+          onSkipLevel={isKids && !isToddler ? () => setSkipOffer(true) : undefined}
           adBusy={adBusy}
         />
       )}

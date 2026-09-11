@@ -30,6 +30,18 @@ export function memoryPairsForLevel(level: number, harder: boolean): number {
   return n;
 }
 
+/** Режим «для самых маленьких» (тыкай пары): пар МАЛО и растут ОЧЕНЬ
+ *  медленно — карточки всегда огромные. Уровней бесконечно, все лёгкие:
+ *  1-й уровень — 3 пары, каждые 3 уровня +1 пара, потолок 6 пар (12
+ *  карточек). Ничего не скрыто, времени нет — только тыкай пары. */
+const TODDLER_PAIRS_START = 3;
+const TODDLER_PAIRS_CAP = 6;
+export function toddlerPairsForLevel(level: number): number {
+  const lv = Math.max(1, Math.floor(level));
+  const n = TODDLER_PAIRS_START + Math.floor((lv - 1) / 3);
+  return Math.min(n, TODDLER_PAIRS_CAP);
+}
+
 function shuffleInPlace<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));

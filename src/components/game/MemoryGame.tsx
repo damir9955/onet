@@ -142,6 +142,8 @@ export default function MemoryGame({
 
   const [previewLeft, setPreviewLeft] = useState(MEMORY_PREVIEW_SEC);
   const [flipped, setFlipped] = useState<number[]>([]);
+  /* красный миг «не пара» (два id) */
+  const [wrongIds, setWrongIds] = useState<number[]>([]);
   const [matched, setMatched] = useState<number[]>([]);
   const [lock, setLock] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -243,13 +245,17 @@ export default function MemoryGame({
         }, MATCH_REVEAL_MS);
         timersRef.current.push(id);
       } else {
-        /* разные: обе открыты, потом первая возвращается рубашкой вверх */
+        /* разные: обе открылись и мигнули КРАСНЫМ, потом ПЕРВАЯ
+           возвращается рубашкой вверх, а ВТОРАЯ ОСТАЁТСЯ открытой —
+           она и есть новый выбор (детям не нужно тыкать заново) */
         setFlipped([firstId, cardData.id]);
+        setWrongIds([firstId, cardData.id]);
         setLock(true);
         setCombo(0);
         sound.play('wrong');
         const id = window.setTimeout(() => {
-          setFlipped([]);
+          setFlipped([cardData.id]);
+          setWrongIds([]);
           setLock(false);
         }, 800);
         timersRef.current.push(id);
@@ -366,6 +372,7 @@ export default function MemoryGame({
                 {deck.map((cardData, idx) => {
                   const up = faceUp(idx);
                   const isMatched = matched.includes(cardData.id);
+                  const isWrong = wrongIds.includes(cardData.id);
                   const skin = kinds[cardData.kind];
                   return (
                     <button
@@ -374,7 +381,10 @@ export default function MemoryGame({
                       onClick={() => handleClick(idx)}
                       aria-label={up ? skin?.ru ?? '' : 'Карточка'}
                       className={
-                        'mem-card' + (up ? ' mem-card--up' : '') + (isMatched ? ' mem-card--matched' : '')
+                        'mem-card' +
+                        (up ? ' mem-card--up' : '') +
+                        (isWrong ? ' mem-card--wrong' : '') +
+                        (isMatched ? ' mem-card--matched' : '')
                       }
                     >
                       <div className="mem-card-inner">
