@@ -155,13 +155,13 @@ export function MenuScreen({
         <div className="menu-bg-veil" />
       </div>
 
-      {/* Заголовок: ярлык игры + название */}
+      {/* Заголовок: реалистичный арт игры (как иконка-ярлык) + название */}
       <div className="relative z-[1] flex items-center gap-4">
         <img
           src="/icons/icon-192.png"
           alt=""
-          width={84}
-          height={84}
+          width={96}
+          height={96}
           draggable={false}
           className="menu-icon"
         />

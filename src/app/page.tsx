@@ -33,8 +33,8 @@ const OnetGame = dynamic(() => import('@/components/game/OnetGame'), {
         <img
           src="/icons/icon-192.png"
           alt="Клик-Клак"
-          width={88}
-          height={88}
+          width={96}
+          height={96}
           draggable={false}
           className="menu-icon"
         />

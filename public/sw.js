@@ -16,14 +16,13 @@
  *    старые кеши вычищаются.
  */
 
-const VERSION = 'klik-klak-v1';
+const VERSION = 'klik-klak-v2';
 const PRECACHE = [
   '/',
   '/manifest.webmanifest',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/maskable-512.png',
-  '/icon.svg',
   '/menu-bg.webp',
   '/tiles/card-back.webp',
   /* картинки стартового экрана загрузки — первый кадр без мерцания */
