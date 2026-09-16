@@ -60,6 +60,13 @@ const AD_REWARD_GRACE_MS = 2500;
  *  считаем досмотром (у веб-rewarded РСЯ колбэк награды нередко
  *  пропадает вовсе, а игрок ролик посмотрел) */
 const AD_MIN_VIEW_MS = 8000;
+/** onClose, пришедший РАНЬШЕ этого после render (и без onRewarded),
+ *  означает, что реклама НЕ УСПЕЛА показаться — нет показа / домен не
+ *  одобрен РСЯ. Такой «пустой» клик ведём в заглушку ('error'), чтобы
+ *  игрок гарантированно увидел рекламу и получил награду — иначе
+ *  выглядит как «нажал за рекламу — а ничего не произошло» (фидбек
+ *  v1.7.1 из детского режима) */
+const AD_FAST_CLOSE_MS = 2000;
 
 let sdkPromise: Promise<boolean> | null = null;
 
@@ -126,6 +133,10 @@ export async function showRewardedAd(): Promise<RewardedResult> {
     let settleTimer = 0;
     let closeGraceTimer = 0;
     let renderedAt = 0;
+    /* момент прихода onClose: «успела ли реклама показаться» считаем по
+       РЕАЛЬНОМУ времени закрытия, а не по моменту grace-таймера
+       (grace добавляет свои 2.5с и искажал картину) */
+    let closedAt = 0;
 
     const finish = (result: RewardedResult) => {
       if (settled) return;
@@ -157,10 +168,15 @@ export async function showRewardedAd(): Promise<RewardedResult> {
            её не было вовсе, а реклама висела достаточно долго —
            честно считаем досмотром. */
         if (closeGraceTimer) window.clearTimeout(closeGraceTimer);
+        closedAt = Date.now();
         closeGraceTimer = window.setTimeout(() => {
           if (rewarded) finish('rewarded');
           else if (rewardedFired) finish('closed');
-          else if (renderedAt && Date.now() - renderedAt >= AD_MIN_VIEW_MS) finish('rewarded');
+          /* реклама не успела показаться (закрылась почти сразу после
+             рендера: нет показа / домен не одобрен) — «пустой» клик не
+             должен пропадать впустую: отправляем в заглушку за наградой */
+          else if (renderedAt && closedAt - renderedAt < AD_FAST_CLOSE_MS) finish('error');
+          else if (renderedAt && closedAt - renderedAt >= AD_MIN_VIEW_MS) finish('rewarded');
           else finish('closed');
         }, AD_REWARD_GRACE_MS);
       },

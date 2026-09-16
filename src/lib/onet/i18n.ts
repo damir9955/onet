@@ -133,6 +133,7 @@ export interface UIStrings {
   toastNoMoves: string;
   toastFrozen: string;
   toastAdBonus: (b: BonusNames) => string;
+  toastAdClosed: string;
 
   lbTitle: string;
   lbEmpty: string;
@@ -270,6 +271,7 @@ const RU: UIStrings = {
   toastNoMoves: 'Нет ходов — перемешали',
   toastFrozen: '❄️ Время стоит',
   toastAdBonus: (b) => `+1 ${b.icon} за рекламу`,
+  toastAdClosed: 'Реклама закрыта раньше времени — награды не будет',
 
   lbTitle: 'Турнирная таблица',
   lbEmpty: 'Пока нет результатов — пройдите пару уровней!',
@@ -410,6 +412,7 @@ const EN: UIStrings = {
   toastNoMoves: 'No moves — reshuffled',
   toastFrozen: '❄️ Time is frozen',
   toastAdBonus: (b) => `+1 ${b.icon} for the ad`,
+  toastAdClosed: 'The ad was closed early — no reward this time',
 
   lbTitle: 'Leaderboard',
   lbEmpty: 'No results yet — pass a couple of levels!',

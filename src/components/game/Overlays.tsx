@@ -1124,7 +1124,10 @@ export function LeaderboardModal({
 export function Toast({ message }: { message: string }) {
   return (
     <div
-      className="toast-in pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-900/70 px-4 py-2 text-sm font-bold text-white shadow-lg backdrop-blur-sm"
+      /* v1.7.2: fixed + z-[80] — тост обязан быть ВИДЕН и поверх модалок
+         (z-50): сообщение «реклама закрыта рано» показывается как раз
+         над экраном проигрыша/паузы, из которого запускалась реклама */
+      className="toast-in pointer-events-none fixed left-1/2 top-3 z-[80] -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-900/70 px-4 py-2 text-sm font-bold text-white shadow-lg backdrop-blur-sm"
       role="status"
     >
       {message}

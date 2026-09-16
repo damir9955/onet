@@ -1306,8 +1306,12 @@ export default function OnetGame() {
       try {
         result = await showRewardedAd();
         if (result === 'error') {
-          /* РСЯ недоступна — показываем заглушку (поверх экрана загрузки) */
-          await new Promise<RewardedResult>((resolve) => {
+          /* РСЯ недоступна — показываем заглушку (поверх экрана загрузки).
+             ФИКС v1.7.2 (фидбек: «нажал пропустить за рекламу — уровень не
+             поменялся»): результат заглушки ОБЯЗАН присваиваться в result —
+             раньше 'rewarded' из промиса выбрасывался, result оставался
+             'error', и после отсчёта награда не выдавалась ВООБЩЕ. */
+          result = await new Promise<RewardedResult>((resolve) => {
             setSimAd({ done: () => resolve('rewarded') });
           });
         }
@@ -1322,6 +1326,14 @@ export default function OnetGame() {
       if (result === 'rewarded') {
         sound.play('win');
         grantAdReward(purpose);
+      } else if (result === 'closed') {
+        /* честный отказ: игрок закрыл рекламу раньше времени — говорим об
+           этом прямо, иначе выглядит как «нажал — ничего не произошло»
+           (тот же фидбек, что привёл к поиску пропавшей награды) */
+        const tt = stringsFor(progressRef.current.lang);
+        setToast(tt.toastAdClosed);
+        const id = window.setTimeout(() => setToast(null), 2600);
+        trackTimer(id);
       }
     },
     [grantAdReward]

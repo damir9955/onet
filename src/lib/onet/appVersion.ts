@@ -10,4 +10,4 @@
  *
  * ПРАВИЛО: поднимаем на каждой сдаче вместе с package.json.
  */
-export const APP_VERSION = '1.7.1';
+export const APP_VERSION = '1.7.2';
