@@ -1,22 +1,38 @@
 /**
- * Service Worker «Клик-Клак»: приложение открывается МГНОВЕННО
- * после установки на рабочий стол (и работает без сети).
+ * Service Worker «Клик-Клак» v1.7.1: полная офлайн-установка.
  *
- * Проблема, которую решает: установленное PWA при каждом запуске
- * качало HTML и JS-бандлы заново — на мобильном интернете это
- * секунды белого/сплэш-экрана. Теперь оболочка игры лежит в кеше:
+ * Ключевое отличие от прошлых версий: кеш ОДИН и СТАБИЛЬНЫЙ —
+ * 'klik-klak-store'. При выходе новой версии SW его НЕ удаляет
+ * (раньше activate вычищал чужие кеши — и полная офлайн-загрузка
+ * терялась бы при каждом обновлении игры). Вычищаются только
+ * легаси-кеши (klik-klak-v1/v2).
  *
- *  - при установке SW префишит оболочку: страницу, манифест, иконки,
- *    фон меню, рубашку карточки и картинки стартового экрана;
- *  - HTML-навигация — stale-while-revalidate: мгновенно из кеша,
- *    свежая версия подтягивается в фоне (запустится в следующий раз);
- *  - иммутабельные ассеты Next (_next/static, иконки, картинки видов) —
- *    cache-first: один раз скачали — всегда отдаём с диска;
- *  - новые версии SW активируются сразу (skipWaiting + clients.claim),
- *    старые кеши вычищаются.
+ * Разделение труда:
+ *  - SW при установке кладёт в кеш только ЛЁГКУЮ оболочку (страница,
+ *    манифест, иконки, фон меню, рубашка) — установка не падает на
+ *    слабой сети (ошибка addAll проглатывается);
+ *  - ТЯЖЁЛУЮ часть (все 90 картинок видов + все _next-бандлы) качает
+ *    загрузчик ПЕРВОЙ установки из интерфейса (lib/onet/offline.ts,
+ *    BootLoader.tsx) — с полоской прогресса и повторами;
+ *  - маркер «игра скачана целиком + версия» лежит в localStorage
+ *    (kk-installed) и зеркалится в этот же кеш (/-kk-install-marker).
+ *
+ * Стратегии fetch:
+ *  - НАВИГАЦИЯ (открытие игры) — мгновенно из кеша, свежая версия HTML
+ *    подтягивается в фоне: обновление применяется при СЛЕДУЮЩЕМ запуске —
+ *    пользователь ничего не замечает;
+ *  - остальная статика — cache-first: один раз скачали, всегда с диска
+ *    (игра полностью работает без интернета).
  */
 
-const VERSION = 'klik-klak-v2';
+const STORE = 'klik-klak-store';
+
+const UI_ICONS = [
+  'hint', 'shuffle', 'freeze', 'pause', 'play', 'star', 'ad', 'trophy',
+  'gear', 'home', 'skip', 'clock', 'refresh', 'link', 'cards', 'tap',
+  'kids', 'door', 'sound', 'sound-off', 'fire', 'party',
+];
+
 const PRECACHE = [
   '/',
   '/manifest.webmanifest',
@@ -25,19 +41,20 @@ const PRECACHE = [
   '/icons/maskable-512.png',
   '/menu-bg.webp',
   '/tiles/card-back.webp',
-  /* картинки стартового экрана загрузки — первый кадр без мерцания */
-  '/tiles/lion.webp',
-  '/tiles/apple.webp',
-  '/tiles/dolphin.webp',
+  ...UI_ICONS.map((n) => `/ui/${n}.webp`),
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
-      const cache = await caches.open(VERSION);
-      /* addAll атомарен: любая ошибка — и установка отменится (не кешируем
-         мусор); при повторном визите попробуем снова */
-      await cache.addAll(PRECACHE);
+      try {
+        const cache = await caches.open(STORE);
+        /* addAll атомарен; на слабой сети он может сорваться — не беда:
+           тяжёлую часть всё равно скачает загрузчик первой установки */
+        await cache.addAll(PRECACHE);
+      } catch (e) {
+        /* оболочка доедет при первом же fetch (cache-first подложит) */
+      }
       await self.skipWaiting();
     })()
   );
@@ -46,8 +63,9 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
+      /* вычищаем ТОЛЬКО чужие/легаси-кеши; стабильный STORE не трогаем */
       const keys = await caches.keys();
-      await Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)));
+      await Promise.all(keys.filter((k) => k !== STORE).map((k) => caches.delete(k)));
       await self.clients.claim();
     })()
   );
@@ -59,11 +77,12 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  /* 1) Навигация (открытие игры): кеш мгновенно, сеть — обновить кеш */
+  /* 1) Навигация (открытие игры): кеш мгновенно, сеть — обновить кеш
+        в фоне. Если сети нет и кеша нет — отдаём оболочку из префиша */
   if (req.mode === 'navigate') {
     event.respondWith(
       (async () => {
-        const cache = await caches.open(VERSION);
+        const cache = await caches.open(STORE);
         const cached = await cache.match(req, { ignoreSearch: true });
         const network = fetch(req)
           .then((res) => {
@@ -76,18 +95,20 @@ self.addEventListener('fetch', (event) => {
           return cached;
         }
         const fresh = await network;
-        /* сети нет, кеша нет — отдаём оболочку из префиша */
         return fresh || (await cache.match('/', { ignoreSearch: true })) || Response.error();
       })()
     );
     return;
   }
 
-  /* 2) Всё остальное (статика, картинки): cache-first с фоновым наполнением */
+  /* 2) Статика (бандлы, картинки, иконки): cache-first с фоновым
+        наполнением — после первой установки всё летает с диска */
   event.respondWith(
     (async () => {
-      const cache = await caches.open(VERSION);
-      const cached = await cache.match(req, { ignoreSearch: url.pathname.startsWith('/_next/') ? false : true });
+      const cache = await caches.open(STORE);
+      const cached = await cache.match(req, {
+        ignoreSearch: url.pathname.startsWith('/_next/') ? false : true,
+      });
       if (cached) return cached;
       try {
         const res = await fetch(req);

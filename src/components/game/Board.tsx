@@ -4,7 +4,7 @@ import React, { memo, useEffect, useRef, useState } from 'react';
 import {
   RING_PAD,
   type Cell,
-  type GravityDir,
+  type GravityPlan,
   type KindSkin,
   type Path,
   type Point,
@@ -53,8 +53,8 @@ export interface BoardProps {
   hintPair: [Point, Point] | null;
   dying: DyingTile[];
   matchLine: Path | null;
-  /** гравитация уровня: камни падают в эту сторону (для анимации) */
-  gravity: GravityDir;
+  /** гравитация уровня: полосы столбцов, каждая — в свою сторону (для анимации) */
+  gravity: GravityPlan;
   /** подпись названия вида над найденной парой */
   namePopup?: NamePopup | null;
   onTileClick: (r: number, c: number) => void;
@@ -252,7 +252,7 @@ const Board = memo(function Board({
                 data-c={c}
                 className={cn(
                   'tile',
-                  gravity !== 'none' && 'tile-fall',
+                  gravity.bands.length > 0 && 'tile-fall',
                   isSel(r, c) && 'tile-selected',
                   isWrong(r, c) && 'tile-wrong',
                   isHint(r, c) && 'tile-hint'

@@ -15,7 +15,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { IconClock, IconPause, IconSkip, IconSoundOff, IconSoundOn, IconStar } from './GameIcons';
+import { IconClock, IconPause, IconSkip, IconStar } from './GameIcons';
+import { Ico3D } from './Ico3D';
 import {
   pickKinds,
   themeForLevel,
@@ -45,7 +46,7 @@ export interface MemoryGameProps {
   onPause: () => void;
   onExit: () => void;
   onSkip: () => void;
-  onToggleSound: () => void;
+  onToggleSound?: () => void;
 }
 
 interface Pop {
@@ -107,7 +108,6 @@ export default function MemoryGame({
   onPause,
   onExit,
   onSkip,
-  onToggleSound,
 }: MemoryGameProps) {
   const theme: LevelTheme = themeForLevel(level);
   const pairs = useMemo(() => memoryPairsForLevel(level, harder), [level, harder]);
@@ -296,6 +296,17 @@ export default function MemoryGame({
       {/* Шапка: уровень + тема, пары, время, очки, пропуск, звук, пауза */}
       <header className="px-2 pt-[max(0.375rem,env(safe-area-inset-top))]">
         <div className="flex items-center gap-2">
+          {/* Пауза — СЛЕВА и «обычная» (фидбек v1.7.0): белый кружок,
+              простой значок — как в классике */}
+          <button
+            type="button"
+            onClick={onPause}
+            disabled={adBusy}
+            aria-label={t.pause}
+            className="game-action-btn game-action-btn--sm game-action-btn--plain"
+          >
+            <IconPause className="h-5 w-5" aria-hidden="true" />
+          </button>
           <span
             className="shrink-0 rounded-full bg-white/80 px-3 py-1 text-sm font-black text-teal-900 shadow-sm"
             title={t.themeLabel(theme)}
@@ -303,7 +314,7 @@ export default function MemoryGame({
             {t.level(level)} · {t.themeLabel(theme)}
           </span>
           <span className="flex shrink-0 items-center gap-1.5 text-sm font-black tabular-nums text-teal-900">
-            <IconStar className="h-4.5 w-4.5" aria-hidden="true" /> {score}
+            <Ico3D name="star" fallback={IconStar} className="h-4.5 w-4.5" alt="" /> {score}
           </span>
           <span className="shrink-0 rounded-full bg-white/70 px-2.5 py-1 text-xs font-bold text-teal-900/80">
             {t.pairsLeft((deck.length - matched.length) / 2)}
@@ -317,7 +328,7 @@ export default function MemoryGame({
             }
             aria-live={inPreview ? 'polite' : undefined}
           >
-            <IconClock className="h-4 w-4" aria-hidden="true" />
+            <Ico3D name="clock" fallback={IconClock} className="h-4 w-4" alt="" />
             {inPreview ? previewLeft : `${minutes}:${String(seconds).padStart(2, '0')}`}
           </span>
           <div className="min-w-0 flex-1" />
@@ -329,25 +340,10 @@ export default function MemoryGame({
             title={t.skipLevel}
             className="game-action-btn game-action-btn--sm game-action-btn--hint"
           >
-            <IconSkip className="h-6 w-6" />
+            <Ico3D name="skip" fallback={IconSkip} className="h-full w-full" alt="" />
           </button>
-          <button
-            type="button"
-            onClick={onToggleSound}
-            aria-label={soundOn ? t.soundOn : t.soundOff}
-            className="game-action-btn game-action-btn--sm game-action-btn--sound"
-          >
-            {soundOn ? <IconSoundOn className="h-6 w-6" /> : <IconSoundOff className="h-6 w-6" />}
-          </button>
-          <button
-            type="button"
-            onClick={onPause}
-            disabled={adBusy}
-            aria-label={t.pause}
-            className="game-action-btn game-action-btn--sm game-action-btn--pause"
-          >
-            <IconPause className="h-6 w-6" />
-          </button>
+          {/* Звук — только в настройках (фидбек v1.6.0): кнопки звука
+              на уровнях больше нет */}
         </div>
       </header>
 

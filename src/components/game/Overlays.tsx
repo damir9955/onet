@@ -2,9 +2,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Ico3D } from './Ico3D';
 import {
   gravityForLevel,
-  isEasyLevel,
   kindImage,
   type BonusKind,
   type GravityDir,
@@ -59,10 +59,31 @@ export interface LeaderRow {
   date: string;
 }
 
-function ModalShell({ children }: { children: React.ReactNode }) {
+/* Стрелки направлений для подписи плана гравитации */
+const GRAVITY_ARROW: Record<GravityDir, string> = {
+  none: '',
+  down: '⬇',
+  up: '⬆',
+  left: '⬅',
+  right: '➡',
+};
+
+function ModalShell({
+  children,
+  cover,
+}: {
+  children: React.ReactNode;
+  /* классика на паузе: фон ПОЛНОСТЬЮ закрыт (поле не просвечивает) */
+  cover?: boolean;
+}) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+      className={
+        'fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 ' +
+        (cover
+          ? 'bg-gradient-to-b from-teal-100 via-emerald-50 to-amber-100'
+          : 'bg-slate-900/45 backdrop-blur-sm')
+      }
       role="dialog"
       aria-modal="true"
     >
@@ -155,7 +176,9 @@ export function MenuScreen({
         <div className="menu-bg-veil" />
       </div>
 
-      {/* Заголовок: реалистичный арт игры (как иконка-ярлык) + название */}
+      {/* Заголовок: реалистичный арт игры (как иконка-ярлык) + название.
+          Фон меню теперь ТЁМНЫЙ — заголовок светлый с золотым отливом
+          и тёмной тенью для читаемости (фидбек v1.7.0) */}
       <div className="relative z-[1] flex items-center gap-4">
         <img
           src="/icons/icon-192.png"
@@ -166,10 +189,12 @@ export function MenuScreen({
           className="menu-icon"
         />
         <div className="text-left">
-          <h1 className="bg-gradient-to-r from-teal-600 via-emerald-600 to-amber-600 bg-clip-text text-4xl font-black tracking-tight text-transparent drop-shadow-sm xl:text-5xl">
+          <h1 className="bg-gradient-to-r from-amber-200 via-yellow-100 to-amber-300 bg-clip-text text-4xl font-black tracking-tight text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)] xl:text-5xl">
             {t.gameTitle}
           </h1>
-          <p className="text-lg font-black text-teal-700/90 xl:text-xl">{t.gameSubtitle}</p>
+          <p className="text-lg font-black text-amber-100/95 drop-shadow-[0_1px_5px_rgba(0,0,0,0.6)] xl:text-xl">
+            {t.gameSubtitle}
+          </p>
         </div>
       </div>
 
@@ -178,7 +203,7 @@ export function MenuScreen({
           {/* ГЛАВНАЯ кнопка — Классика: крупная, сразу понятно, что нажимать */}
           <button type="button" onClick={onPlay} className="menu-cta">
             <span className="menu-cta-icon">
-              <IconPlay className="h-7 w-7" />
+              <Ico3D name="play" fallback={IconPlay} className="h-full w-full" alt="" />
             </span>
             <span className="min-w-0 flex-1 text-left">
               <span className="menu-cta-title">{fresh ? t.play : t.continueLevel(level)}</span>
@@ -189,33 +214,34 @@ export function MenuScreen({
             <IconArrowRight className="h-6 w-6 shrink-0 opacity-50" />
           </button>
 
-          {/* Детский режим — вторая большая карточка (открывает подменю) */}
+          {/* Детский режим — вторая большая карточка (открывает подменю):
+              сочный янтарно-оранжевый градиент, белый текст */}
           <button type="button" onClick={() => setView('kids')} className="mode-card mode-card--kids">
             <ModeThumbs names={['lion', 'panda', 'watermelon']} />
             <span className="min-w-0 flex-1 text-left">
-              <span className="flex items-center gap-1.5 text-lg font-black text-teal-900">
-                <IconKids className="h-6 w-6" /> {t.kidsTitle}
+              <span className="flex items-center gap-1.5 text-lg font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
+                <Ico3D name="kids" fallback={IconKids} className="h-7 w-7" alt="" /> {t.kidsTitle}
               </span>
               <span className="mode-card-desc">{t.kidsDesc}</span>
-              <span className="block text-sm font-black text-amber-700">
+              <span className="block text-sm font-black text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
                 {kidsFresh ? t.memoryTitle + ' · ' + t.kidsOnetTitle : t.continueKids(kidsLevel)}
               </span>
             </span>
-            <IconArrowRight className="h-6 w-6 shrink-0 text-amber-500/70" />
+            <IconArrowRight className="h-6 w-6 shrink-0 text-white/85" />
           </button>
 
           {/* Вторичные действия: таблица и настройки (всё остальное —
               внутри настроек, чтобы меню было простым и понятным) */}
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={onShowLeaderboard} className="menu-pill menu-pill--amber">
-              <IconTrophy className="h-4 w-4" /> {t.leaderboard}
+              <Ico3D name="trophy" fallback={IconTrophy} className="h-4 w-4" alt="" /> {t.leaderboard}
             </button>
             <button
               type="button"
               onClick={() => setShowSettings(true)}
               className="menu-pill menu-pill--teal"
             >
-              <IconGear className="h-4 w-4" /> {t.settings}
+              <Ico3D name="gear" fallback={IconGear} className="h-4 w-4" alt="" /> {t.settings}
             </button>
           </div>
         </div>
@@ -225,52 +251,52 @@ export function MenuScreen({
           <button
             type="button"
             onClick={() => setView('main')}
-            className="flex items-center gap-1.5 self-start rounded-full bg-white/80 px-3 py-1.5 text-sm font-bold text-teal-800 shadow-sm transition hover:scale-105 active:scale-95"
+            className="flex items-center gap-1.5 self-start rounded-full bg-white px-3.5 py-1.5 text-sm font-black text-teal-800 shadow-[0_4px_14px_rgba(0,0,0,0.45)] ring-1 ring-black/10 transition hover:scale-105 active:scale-95"
           >
             <IconBack className="h-4 w-4" /> {t.back}
           </button>
 
-          <button type="button" onClick={onKidsOnet} className="mode-card mode-card--kids">
+          <button type="button" onClick={onKidsOnet} className="mode-card mode-card--mint">
             <ModeThumbs names={['fox', 'giraffe', 'cow']} />
             <span className="min-w-0 flex-1 text-left">
-              <span className="flex items-center gap-1.5 text-lg font-black text-teal-900">
-                <IconLink className="h-6 w-6" /> {t.kidsOnetTitle}
+              <span className="flex items-center gap-1.5 text-lg font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
+                <Ico3D name="link" fallback={IconLink} className="h-7 w-7" alt="" /> {t.kidsOnetTitle}
               </span>
               <span className="mode-card-desc">{t.kidsOnetDesc}</span>
-              <span className="block text-sm font-black text-emerald-700">
+              <span className="block text-sm font-black text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
                 {t.continueKids(kidsLevel)}
               </span>
             </span>
-            <IconArrowRight className="h-6 w-6 shrink-0 text-emerald-500/70" />
+            <IconArrowRight className="h-6 w-6 shrink-0 text-white/85" />
           </button>
 
-          <button type="button" onClick={onKidsMemory} className="mode-card mode-card--kids">
+          <button type="button" onClick={onKidsMemory} className="mode-card mode-card--sky">
             <ModeThumbs names={['penguin', 'mango', 'rabbit']} />
             <span className="min-w-0 flex-1 text-left">
-              <span className="flex items-center gap-1.5 text-lg font-black text-teal-900">
-                <IconCards className="h-6 w-6" /> {t.memoryTitle}
+              <span className="flex items-center gap-1.5 text-lg font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
+                <Ico3D name="cards" fallback={IconCards} className="h-7 w-7" alt="" /> {t.memoryTitle}
               </span>
               <span className="mode-card-desc">{t.memoryDesc}</span>
-              <span className="block text-sm font-black text-sky-700">
+              <span className="block text-sm font-black text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
                 {t.continueKids(kidsLevel)}
               </span>
             </span>
-            <IconArrowRight className="h-6 w-6 shrink-0 text-sky-500/70" />
+            <IconArrowRight className="h-6 w-6 shrink-0 text-white/85" />
           </button>
 
           {/* Тыкай пары — для самых маленьких: без времени, всё открыто */}
-          <button type="button" onClick={onKidsToddler} className="mode-card mode-card--kids">
+          <button type="button" onClick={onKidsToddler} className="mode-card mode-card--rose">
             <ModeThumbs names={['bear', 'duck', 'grapes']} />
             <span className="min-w-0 flex-1 text-left">
-              <span className="flex items-center gap-1.5 text-lg font-black text-teal-900">
-                <IconTap className="h-6 w-6" /> {t.toddlerTitle}
+              <span className="flex items-center gap-1.5 text-lg font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
+                <Ico3D name="tap" fallback={IconTap} className="h-7 w-7" alt="" /> {t.toddlerTitle}
               </span>
               <span className="mode-card-desc">{t.toddlerDesc}</span>
-              <span className="block text-sm font-black text-rose-700">
+              <span className="block text-sm font-black text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
                 {t.continueKids(kidsLevel)}
               </span>
             </span>
-            <IconArrowRight className="h-6 w-6 shrink-0 text-rose-500/70" />
+            <IconArrowRight className="h-6 w-6 shrink-0 text-white/85" />
           </button>
 
           {/* Сложность: Проще / Посложнее — заметная панель (не сливается с фоном) */}
@@ -323,7 +349,7 @@ export function MenuScreen({
       {confirmNew && (
         <ModalShell>
           <div className="flex justify-center" aria-hidden="true">
-            <IconRefresh className="h-12 w-12" />
+            <Ico3D name="refresh" fallback={IconRefresh} className="h-12 w-12" alt="" />
           </div>
           <h2 className="mt-2 text-xl font-black text-teal-900">{t.confirmNewTitle}</h2>
           <p className="mt-2 text-sm font-semibold text-teal-900/60">{t.confirmNewBody}</p>
@@ -376,7 +402,7 @@ export function SettingsModal({
   return (
     <ModalShell>
       <div className="flex justify-center" aria-hidden="true">
-        <IconGear className="h-12 w-12" />
+        <Ico3D name="gear" fallback={IconGear} className="h-12 w-12" alt="" />
       </div>
       <h2 className="mt-2 text-xl font-black text-teal-900">{t.settingsTitle}</h2>
 
@@ -412,7 +438,7 @@ export function SettingsModal({
       {/* Звук */}
       <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-teal-50/70 px-4 py-3 ring-1 ring-teal-100">
         <span className="flex items-center gap-1.5 text-sm font-bold text-teal-900/70">
-          {soundOn ? <IconSoundOn className="h-5 w-5" /> : <IconSoundOff className="h-5 w-5" />}{' '}
+          <Ico3D name={soundOn ? 'sound' : 'sound-off'} fallback={soundOn ? IconSoundOn : IconSoundOff} className="h-5 w-5" alt="" />{' '}
           {t.sound}
         </span>
         <button
@@ -442,7 +468,7 @@ export function SettingsModal({
           className="mt-4 flex w-full items-center justify-between rounded-2xl bg-rose-50/80 px-4 py-3 ring-1 ring-rose-200 transition hover:bg-rose-100/80 active:scale-95"
         >
           <span className="flex items-center gap-1.5 text-sm font-bold text-rose-700">
-            <IconRefresh className="h-5 w-5" /> {t.newGame}
+            <Ico3D name="refresh" fallback={IconRefresh} className="h-5 w-5" alt="" /> {t.newGame}
           </span>
           <span className="rounded-full bg-rose-500 px-3 py-1 text-xs font-black text-white shadow">
             {t.startOver}
@@ -476,14 +502,19 @@ export interface LevelBannerProps {
 }
 
 export function LevelBanner({ level, t, kids, theme, checkpoint, low }: LevelBannerProps) {
-  const easy = isEasyLevel(level);
   let sub: string | undefined;
   if (kids) {
     sub = t.themeLabel(theme ?? 'mixed');
   } else if (checkpoint) {
     sub = t.bannerCheckpoint;
   } else {
-    sub = easy ? t.bannerEasy : t.gravity[gravityForLevel(level)];
+    /* план гравитации уровня: одно направление или полосы в разные стороны */
+    const plan = gravityForLevel(level);
+    if (plan.bands.length > 1) {
+      sub = `${plan.bands.map((d) => GRAVITY_ARROW[d]).join('')} · ${t.gravitySplit}`;
+    } else {
+      sub = t.gravity[plan.bands[0] ?? 'none'];
+    }
   }
   return (
     <div
@@ -507,13 +538,15 @@ export interface PauseModalProps {
   /** детский режим: «пропустить уровень за рекламу» */
   onSkipLevel?: () => void;
   adBusy?: boolean;
+  /* классика: фон под паузой НЕ просвечивает — «шторка» вместо вуали */
+  cover?: boolean;
 }
 
-export function PauseModal({ t, level, onResume, onMenu, onSkipLevel, adBusy }: PauseModalProps) {
+export function PauseModal({ t, level, onResume, onMenu, onSkipLevel, adBusy, cover }: PauseModalProps) {
   return (
-    <ModalShell>
+    <ModalShell cover={cover}>
       <div className="flex justify-center" aria-hidden="true">
-        <IconPause className="h-12 w-12" />
+        <Ico3D name="pause" fallback={IconPause} className="h-12 w-12" alt="" />
       </div>
       <h2 className="mt-2 text-2xl font-black text-teal-900">{t.pauseTitle}</h2>
       <p className="mt-1 text-sm font-semibold text-teal-900/60">{t.level(level)}</p>
@@ -521,7 +554,8 @@ export function PauseModal({ t, level, onResume, onMenu, onSkipLevel, adBusy }: 
         <Button
           onClick={onResume}
           autoFocus
-          className="h-12 w-full rounded-full bg-emerald-500 text-base font-bold text-white shadow-lg hover:bg-emerald-600 active:scale-95"
+          disabled={adBusy}
+          className="h-12 w-full rounded-full bg-emerald-500 text-base font-bold text-white shadow-lg hover:bg-emerald-600 active:scale-95 disabled:opacity-50"
         >
           {t.resume}
         </Button>
@@ -537,7 +571,8 @@ export function PauseModal({ t, level, onResume, onMenu, onSkipLevel, adBusy }: 
         <Button
           onClick={onMenu}
           variant="ghost"
-          className="h-11 w-full rounded-full text-teal-900/60 hover:bg-teal-50 active:scale-95"
+          disabled={adBusy}
+          className="h-11 w-full rounded-full text-teal-900/60 hover:bg-teal-50 active:scale-95 disabled:opacity-50"
         >
           <IconHome className="mr-2 h-4 w-4" /> {t.exitToMenu}
         </Button>
@@ -559,7 +594,7 @@ export function ExitConfirmModal({ t, resetLevel, onConfirm, onCancel }: ExitCon
   return (
     <ModalShell>
       <div className="flex justify-center" aria-hidden="true">
-        <IconDoor className="h-12 w-12" />
+        <Ico3D name="door" fallback={IconDoor} className="h-12 w-12" alt="" />
       </div>
       <h2 className="mt-2 text-xl font-black text-teal-900">{t.exitTitle}</h2>
       <p className="mt-2 text-sm font-semibold text-teal-900/70">{t.exitBody(resetLevel)}</p>
@@ -598,8 +633,8 @@ export function SkipConfirmModal({ t, level, onWatch, onClose }: SkipConfirmModa
     <ModalShell>
       <div className="flex justify-center" aria-hidden="true">
         <span className="relative flex h-14 w-14 items-center justify-center">
-          <IconSkip className="absolute h-14 w-14 opacity-25" />
-          <IconSkip className="relative h-10 w-10" />
+          <Ico3D name="skip" fallback={IconSkip} className="absolute h-14 w-14 opacity-25" alt="" />
+          <Ico3D name="skip" fallback={IconSkip} className="relative h-10 w-10" alt="" />
         </span>
       </div>
       <h2 className="mt-2 text-xl font-black text-teal-900">{t.skipConfirmTitle}</h2>
@@ -610,7 +645,7 @@ export function SkipConfirmModal({ t, level, onWatch, onClose }: SkipConfirmModa
           onClick={onWatch}
           className="flex h-12 w-full items-center justify-center gap-2.5 rounded-full bg-gradient-to-b from-amber-400 to-amber-500 px-6 text-base font-black text-white shadow-lg shadow-amber-500/40 ring-2 ring-amber-300 transition hover:brightness-105 active:scale-95"
         >
-          <IconAd className="h-5 w-5" /> {t.watchAdSkip}
+          <Ico3D name="ad" fallback={IconAd} className="h-5 w-5" alt="" /> {t.watchAdSkip}
         </button>
         <Button
           onClick={onClose}
@@ -652,18 +687,18 @@ export interface WinModalProps {
 export function WinModal({ t, info, streak, saved, kids, onNext, onMenu }: WinModalProps) {
   const gained = info.levelScore + info.timeBonus;
   const earned = [
-    info.earned.hint > 0 ? { n: '+1', Icon: IconHint } : null,
-    info.earned.shuffle > 0 ? { n: '+1', Icon: IconShuffle } : null,
-    info.earned.freeze > 0 ? { n: '+1', Icon: IconFreeze } : null,
-  ].filter(Boolean) as { n: string; Icon: React.ComponentType<GameIconProps> }[];
+    info.earned.hint > 0 ? { n: '+1', name: 'hint' as const, Icon: IconHint } : null,
+    info.earned.shuffle > 0 ? { n: '+1', name: 'shuffle' as const, Icon: IconShuffle } : null,
+    info.earned.freeze > 0 ? { n: '+1', name: 'freeze' as const, Icon: IconFreeze } : null,
+  ].filter(Boolean) as { n: string; name: 'hint' | 'shuffle' | 'freeze'; Icon: React.ComponentType<GameIconProps> }[];
   return (
     <ModalShell>
       <div className="flex justify-center" aria-hidden="true">
-        <IconParty className="h-12 w-12" />
+        <Ico3D name="party" fallback={IconParty} className="h-12 w-12" alt="" />
       </div>
       <h2 className="mt-2 text-2xl font-black text-teal-900">{t.winTitle(info.level)}</h2>
       <div className="mt-3 flex items-center justify-center gap-1.5 text-3xl font-black tabular-nums text-emerald-600">
-        +{gained} <IconStar className="h-7 w-7" />
+        +{gained} <Ico3D name="star" fallback={IconStar} className="h-7 w-7" alt="" />
       </div>
       {saved && (
         <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800 ring-1 ring-emerald-200">
@@ -672,17 +707,17 @@ export function WinModal({ t, info, streak, saved, kids, onNext, onMenu }: WinMo
       )}
       {!kids && streak > 0 && (
         <p className="mt-1 flex items-center justify-center gap-1.5 text-sm font-bold text-orange-600/90">
-          <IconFire className="h-4.5 w-4.5" /> {t.winStreak(streak)}
+          <Ico3D name="fire" fallback={IconFire} className="h-4.5 w-4.5" alt="" /> {t.winStreak(streak)}
         </p>
       )}
       {earned.length > 0 && (
         <div className="mt-2 flex justify-center gap-3">
-          {earned.map(({ n, Icon }) => (
+          {earned.map(({ n, name, Icon }) => (
             <span
-              key={Icon.name ?? 'bonus'}
+              key={name}
               className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-sm font-black text-amber-700 ring-1 ring-amber-200"
             >
-              {n} <Icon className="h-4.5 w-4.5" />
+              {n} <Ico3D name={name} fallback={Icon} className="h-4.5 w-4.5" alt="" />
             </span>
           ))}
         </div>
@@ -753,7 +788,11 @@ export function GameOverModal({
   return (
     <ModalShell>
       <div className="flex justify-center" aria-hidden="true">
-        {kids ? <IconKids className="h-12 w-12" /> : <IconClock className="h-12 w-12" />}
+        {kids ? (
+          <Ico3D name="kids" fallback={IconKids} className="h-12 w-12" alt="" />
+        ) : (
+          <Ico3D name="clock" fallback={IconClock} className="h-12 w-12" alt="" />
+        )}
       </div>
       <h2 className="mt-2 text-2xl font-black text-rose-700">
         {kids ? t.kidsOverTitle : t.gameOverTitle}
@@ -769,13 +808,13 @@ export function GameOverModal({
         </p>
       )}
       <p className="mt-2 flex items-center justify-center gap-1.5 text-sm font-bold text-teal-900/70">
-        <IconStar className="h-4.5 w-4.5" /> {totalScore}
+        <Ico3D name="star" fallback={IconStar} className="h-4.5 w-4.5" alt="" /> {totalScore}
       </p>
 
       {qualified && !kids && (
         <div className="mt-3 text-left">
           <p className="flex items-center justify-center gap-1.5 text-xs font-black text-amber-600">
-            <IconTrophy className="h-4 w-4" /> {t.inTop10}
+            <Ico3D name="trophy" fallback={IconTrophy} className="h-4 w-4" alt="" /> {t.inTop10}
           </p>
           <input
             type="text"
@@ -789,6 +828,10 @@ export function GameOverModal({
         </div>
       )}
 
+      {/* ПОКА ИДЁТ РЕКЛАМА — ВСЕ кнопки заблокированы (фидбек v1.6.0:
+          раньше можно было нажать «Начать с уровня»/«В меню» во время
+          тишины после клика «Смотреть рекламу» — игра сбрасывалась,
+          а реклама опаздывала поверх нового уровня) */}
       <div className="mt-5 flex flex-col gap-2.5">
         {kids && onSkip && (
           <Button
@@ -797,7 +840,7 @@ export function GameOverModal({
             autoFocus
             className="h-12 w-full rounded-full bg-amber-500 text-sm font-black text-white shadow-lg shadow-amber-500/30 hover:bg-amber-600 active:scale-95 disabled:opacity-50"
           >
-            <IconSkip className="mr-2 h-5 w-5" /> {t.skipLevel}
+            <Ico3D name="skip" fallback={IconSkip} className="mr-2 h-5 w-5" alt="" /> {t.skipLevel}
           </Button>
         )}
         {!kids && canAdRetry && (
@@ -807,13 +850,14 @@ export function GameOverModal({
             autoFocus
             className="h-12 w-full rounded-full bg-amber-500 text-sm font-black text-white shadow-lg shadow-amber-500/30 hover:bg-amber-600 active:scale-95 disabled:opacity-50"
           >
-            <IconAd className="mr-2 h-5 w-5" /> {t.adRetry(level)}
+            <Ico3D name="ad" fallback={IconAd} className="mr-2 h-5 w-5" alt="" /> {t.adRetry(level)}
           </Button>
         )}
         <Button
           onClick={() => onFromCheckpoint()}
+          disabled={adBusy}
           className={
-            'h-12 w-full rounded-full bg-emerald-500 text-base font-black text-white shadow-lg hover:bg-emerald-600 active:scale-95 ' +
+            'h-12 w-full rounded-full bg-emerald-500 text-base font-black text-white shadow-lg hover:bg-emerald-600 active:scale-95 disabled:opacity-50 ' +
             (canAdRetry && !kids ? 'mt-0' : '')
           }
         >
@@ -822,7 +866,8 @@ export function GameOverModal({
         <Button
           onClick={onMenu}
           variant="ghost"
-          className="h-11 w-full rounded-full text-teal-900/60 hover:bg-teal-50 active:scale-95"
+          disabled={adBusy}
+          className="h-11 w-full rounded-full text-teal-900/60 hover:bg-teal-50 active:scale-95 disabled:opacity-50"
         >
           <IconHome className="mr-2 h-4 w-4" /> {t.toMenu}
         </Button>
@@ -867,7 +912,7 @@ export function AdOfferModal({ t, bonus, onWatch, onClose }: AdOfferModalProps) 
         </button>
 
         <div className="flex justify-center" aria-hidden="true">
-          <BonusIcon className="h-12 w-12" />
+          <Ico3D name={bonus} fallback={BonusIcon} className="h-12 w-12" alt="" />
         </div>
         <h2 className="mt-2 text-xl font-black text-teal-900">{t.bonusOver(b)}</h2>
         <p className="mt-2 text-sm font-semibold text-teal-900/70">{t.adOfferBody(b)}</p>
@@ -878,7 +923,7 @@ export function AdOfferModal({ t, bonus, onWatch, onClose }: AdOfferModalProps) 
           onClick={onWatch}
           className="mt-5 flex h-16 w-full items-center justify-center gap-2.5 rounded-full bg-gradient-to-b from-amber-400 to-amber-500 px-6 text-lg font-black text-white shadow-lg shadow-amber-500/40 ring-2 ring-amber-300 transition hover:brightness-105 active:scale-95"
         >
-          <IconAd className="h-6 w-6" /> {t.watchAd}
+          <Ico3D name="ad" fallback={IconAd} className="h-6 w-6" alt="" /> {t.watchAd}
         </button>
       </div>
     </div>
@@ -933,7 +978,7 @@ export function SimAdOverlay({ t, seconds = 5, onDone }: SimAdOverlayProps) {
 
       {/* «рекламный» баннер-заглушка */}
       <div className="flex h-40 w-full max-w-xs flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-700 ring-1 ring-white/10">
-        <IconAd className="h-14 w-14" />
+        <Ico3D name="ad" fallback={IconAd} className="h-14 w-14" alt="" />
         <span className="px-6 text-center text-sm font-bold text-white/50">
           {t.gameTitle} · {t.gameSubtitle}
         </span>
@@ -948,6 +993,31 @@ export function SimAdOverlay({ t, seconds = 5, onDone }: SimAdOverlayProps) {
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ============ Экран «Загружаем рекламу…» (мгновенный отклик на клик) ============ */
+
+export interface AdPendingOverlayProps {
+  t: UIStrings;
+}
+
+/** Виден с момента клика «Смотреть рекламу» до появления самой рекламы
+ *  (или заглушки): раньше эти секунды выглядели как «ничего не произошло»,
+ *  и игрок успевал сбросить игру — реклама опаздывала поверх нового уровня. */
+export function AdPendingOverlay({ t }: AdPendingOverlayProps) {
+  return (
+    <div
+      className="fixed inset-0 z-[65] flex flex-col items-center justify-center gap-5 bg-slate-950/95 p-6 text-white"
+      role="status"
+      aria-live="polite"
+      aria-label={t.adLoading}
+    >
+      <div className="ad-pending-spinner" aria-hidden="true">
+        <Ico3D name="ad" fallback={IconAd} className="h-12 w-12" alt="" />
+      </div>
+      <p className="text-sm font-bold text-white/80">{t.adLoading}</p>
     </div>
   );
 }
@@ -975,7 +1045,7 @@ export function LeaderboardModal({
   return (
     <ModalShell>
       <div className="flex justify-center" aria-hidden="true">
-        <IconTrophy className="h-12 w-12" />
+        <Ico3D name="trophy" fallback={IconTrophy} className="h-12 w-12" alt="" />
       </div>
       <h2 className="mt-2 text-xl font-black text-teal-900">{t.lbTitle}</h2>
 

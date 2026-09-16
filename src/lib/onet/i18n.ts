@@ -21,6 +21,13 @@ export interface UIStrings {
   gameSubtitle: string;
   tagline: string;
 
+  /* v1.6.0: первая установка — полное скачивание игры на устройство */
+  bootTitle: string;
+  bootNote: string;
+  bootError: string;
+  bootRetry: string;
+  bootPrepare: string;
+
   play: string;
   continueLevel: (level: number) => string;
   newGame: string;
@@ -52,6 +59,10 @@ export interface UIStrings {
 
   bannerEasy: string;
   gravity: Record<GravityDir, string>;
+  /* v1.7.0: полосы столбцов падают в разные стороны */
+  gravitySplit: string;
+  /* v1.7.0: реклама грузится — мгновенная обратная связь на клик */
+  adLoading: string;
 
   pauseTitle: string;
   resume: string;
@@ -141,6 +152,12 @@ export interface UIStrings {
 const RU: UIStrings = {
   gameTitle: 'КЛИК-КЛАК',
   gameSubtitle: 'Соедини пары',
+
+  bootTitle: 'Скачиваем игру на устройство',
+  bootNote: 'Игра сохранится на телефон и будет работать без интернета',
+  bootError: 'Нужно подключение к интернету для первого запуска',
+  bootRetry: 'Повторить',
+  bootPrepare: 'Проверяем…',
   tagline: 'Нажимай на одинаковые картинки',
 
   play: 'Играть',
@@ -179,6 +196,8 @@ const RU: UIStrings = {
     left: 'камни едут влево ⬅',
     right: 'камни едут вправо ➡',
   },
+  gravitySplit: 'поле разделено: части едут в разные стороны',
+  adLoading: 'Загружаем рекламу…',
 
   pauseTitle: 'Пауза',
   resume: 'Продолжить',
@@ -274,6 +293,12 @@ const RU: UIStrings = {
 const EN: UIStrings = {
   gameTitle: 'CLICK-CLACK',
   gameSubtitle: 'Match the pairs',
+
+  bootTitle: 'Downloading the game',
+  bootNote: 'The game will be saved to your device and will work offline',
+  bootError: 'Connect to the internet for the first launch',
+  bootRetry: 'Retry',
+  bootPrepare: 'Checking…',
   tagline: 'Tap two identical pictures to connect them',
 
   play: 'Play',
@@ -312,6 +337,8 @@ const EN: UIStrings = {
     left: 'stones slide left ⬅',
     right: 'stones slide right ➡',
   },
+  gravitySplit: 'the board is split: parts move in different directions',
+  adLoading: 'Loading the ad…',
 
   pauseTitle: 'Pause',
   resume: 'Resume',

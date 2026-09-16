@@ -13,16 +13,17 @@
  * ПОЛПЛИТКИ с каждой стороны — по нему проходит линия соединения
  * (объездной путь по внешнему кольцу), поэтому она не наезжает на меню
  * сверху и не обрезается краем экрана.
- * Сложность как в оригинале: плотное поле с 1-го уровня, но карточек
- * не больше, чем на 3-м уровне (96) — дальше поле не растёт. Каждый
- * 3-й уровень — ЛЁГКИЙ (передышка: меньше карточек, без падений),
- * чтобы не уставать. На остальных уровнях работает ГРАВИТАЦИЯ
- * как в классическом Pao Pao: после уборки пары оставшиеся камни
- * падают вниз / вверх / уезжают влево / вправо (направление меняется
- * от уровня к уровню). На поле всегда несколько «семейств»
- * похожих по цвету видов — фон карточки подкрашен в тон фигурке,
- * и их легко перепутать. Одинаковые карточки разнесены по полю:
- * пары не стоят рядом.
+ * СЛОЖНОСТЬ — ЛЕСТНИЦА от простого к сложному (фидбек v1.6.0):
+ * поле растёт 36 → 126 плиток, виды 8 → 30, секунд на пару 9 → 3.
+ * Механика падений вводится постепенно: сначала без падений, потом
+ * каждое направление по очереди, затем поле ДЕЛИТСЯ НА ПОЛОСЫ (2–4
+ * столбца), и каждая полоса падает в СВОЮ сторону — вниз/вверх/
+ * влево/вправо, как в поздних уровнях классического Pao Pao.
+ * После 30-го уровня — бесконечный режим на максимуме, комбинации
+ * полос меняются от уровня к уровню. На поле всегда несколько
+ * «семейств» похожих по цвету видов — фон карточки подкрашен в тон
+ * фигурке, и их легко перепутать. Одинаковые карточки разнесены
+ * по полю: пары не стоят рядом.
  */
 
 /** Направление гравитации уровня: куда «падают» камни после уборки пары */
@@ -56,8 +57,8 @@ export interface LevelConfig {
   /** полное время на уровень, сек: минимум 3 минуты,
    *  за совпадение время НЕ возвращается */
   time: number;
-  /** куда падают камни после уборки пары (гравитация, как в Pao Pao) */
-  gravity: GravityDir;
+  /** куда падают камни после уборки пары (полосы столбцов, как в Pao Pao) */
+  gravity: GravityPlan;
   /** лёгкий уровень (каждый 3-й) — передышка */
   easy: boolean;
   /** тема уровня (детский режим: звери / фрукты-овощи / вперемешку) */
@@ -70,41 +71,134 @@ export { pickKinds, kindImage, KINDS_TOTAL } from './kinds';
 export type { KindSkin, KindCat, PickKindsOptions } from './kinds';
 import { KINDS_TOTAL } from './kinds';
 
-/* ============ Сложность: как в классическом Pao Pao ============ */
+/* ============ Сложность: лестница как в классическом Pao Pao ============ */
 
-/** Лёгкий уровень — каждый 3-й (3, 6, 9, ...): передышка, чтобы
- *  не уставать. Меньше карточек, меньше видов, без падений камней. */
+/**
+ * План гравитации уровня: поле делится на полосы СТОЛБЦОВ (2–4),
+ * каждая полоса «падает» в СВОЮ сторону. Один элемент в bands —
+ * вся доска едет в одну сторону (как раньше). Пустой массив — без падений.
+ * Так устроены поздние уровни классического Pao Pao: половина поля
+ * падает вниз, половина вверх; или левая часть уезжает влево, правая —
+ * вправо (плиты расходятся от центра) и т.п.
+ */
+export interface GravityPlan {
+  bands: GravityDir[];
+}
+
+/** Уровень без падений */
+export const NO_GRAVITY: GravityPlan = { bands: [] };
+
+/** Вся доска едет в одну сторону */
+export function singleGravity(dir: GravityDir): GravityPlan {
+  return dir === 'none' ? NO_GRAVITY : { bands: [dir] };
+}
+
+/** Границы полос столбцов (0-based, включительно) при делении cols на n полос */
+export function bandBounds(cols: number, n: number): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  const base = Math.floor(cols / n);
+  const extra = cols % n;
+  let c = 0;
+  for (let b = 0; b < n; b++) {
+    const w = Math.max(1, base + (b < extra ? 1 : 0));
+    out.push([c, Math.min(cols - 1, c + w - 1)]);
+    c += w;
+  }
+  return out;
+}
+
+/** Лёгкий уровень — только для ДЕТСКОГО режима (каждый 3-й: передышка).
+ *  В КЛАССИКЕ лёгких «передышек» больше нет — сложность растёт монотонно. */
 export function isEasyLevel(level: number): boolean {
   return Math.max(1, Math.floor(level)) % 3 === 0;
 }
 
 /**
- * Целевое число плиток по уровням: плотное поле с самого начала,
- * но НЕ больше, чем на 3-м уровне (96 карточек) — дальше поле
- * не растёт. Лёгкие уровни — маленькие поля (72), как на первом.
+ * Правило уровня классики: поле, виды, секунд на пару и план гравитации.
+ * ЛЕСТНИЦА от простого к сложному (как в Pao Pao):
+ *  - 1–2: без падений — научиться соединять;
+ *  - 3–10: каждое направление падения по два раза (вниз → вверх → влево → вправо),
+ *    поле и виды растут, времени на пару — меньше;
+ *  - 11–14: все направления снова, поле плотнее;
+ *  - 15–18: ПОЛОСЫ: половина поля падает не туда, куда вторая
+ *    (расходятся / навстречу / сходятся к центру);
+ *  - 19–22: одиночные направления на самом большом поле;
+ *  - 23–30: три и четыре полосы, каждая в свою сторону;
+ *  - 31+: бесконечный режим — максимум плиток и видов, комбинации полос
+ *    меняются от уровня к уровню (детерминированно), секунды — минимум.
  */
-const TILES_TARGET: readonly number[] = [72, 84, 96];
-const TILES_CAP = 96;
-const EASY_TILES = 72;
+interface LevelRule {
+  /** целевое число плиток */
+  tiles: number;
+  /** сколько видов */
+  kinds: number;
+  /** секунд на пару */
+  sec: number;
+  gravity: GravityPlan;
+}
 
-const KINDS_START = 18;
-const KINDS_STEP = 4;
-/* Максимум видов — как на 3-м уровне (26): дальше фигур не прибавляется,
- * чтобы поле оставалось проходимым и не превращалось в «каждый сам по себе» */
-const KINDS_CAP = 26;
+const L: GravityDir[] = ['down', 'up', 'left', 'right'];
 
-/* Время: ~5 с/пару на старте, мягко убывает, но не ниже 3.2 с/пару,
- * и на ЛЮБОМ уровне не меньше 3 минут целиком (180 с) — поля плотные
- * с 1-го уровня, карточек много, поэтому времени даём с запасом. */
-const SEC_PER_PAIR_START = 5.0;
-const SEC_PER_PAIR_STEP = 0.3;
-const SEC_PER_PAIR_MIN = 3.2;
-/* сложные уровни: чуть больше времени (+0.05 с/пару за уровень, потолок +1.5),
- * но уровень остаётся сложным — секунд на пару всё равно меньше, чем на 1-м */
-const SEC_PER_PAIR_LEVEL_STEP = 0.05;
-const SEC_PER_PAIR_LEVEL_CAP = 1.5;
+const LADDER: readonly LevelRule[] = [
+  /* 1 */ { tiles: 36, kinds: 8, sec: 9.0, gravity: NO_GRAVITY },
+  /* 2 */ { tiles: 48, kinds: 10, sec: 8.5, gravity: NO_GRAVITY },
+  /* 3 */ { tiles: 48, kinds: 12, sec: 8.0, gravity: singleGravity('down') },
+  /* 4 */ { tiles: 60, kinds: 12, sec: 7.6, gravity: singleGravity('down') },
+  /* 5 */ { tiles: 60, kinds: 14, sec: 7.2, gravity: singleGravity('up') },
+  /* 6 */ { tiles: 72, kinds: 14, sec: 6.8, gravity: singleGravity('up') },
+  /* 7 */ { tiles: 72, kinds: 16, sec: 6.4, gravity: singleGravity('left') },
+  /* 8 */ { tiles: 84, kinds: 16, sec: 6.0, gravity: singleGravity('left') },
+  /* 9 */ { tiles: 84, kinds: 18, sec: 5.6, gravity: singleGravity('right') },
+  /* 10 */ { tiles: 96, kinds: 18, sec: 5.2, gravity: singleGravity('right') },
+  /* 11 */ { tiles: 96, kinds: 20, sec: 5.0, gravity: singleGravity('down') },
+  /* 12 */ { tiles: 96, kinds: 20, sec: 4.8, gravity: singleGravity('up') },
+  /* 13 */ { tiles: 108, kinds: 22, sec: 4.6, gravity: singleGravity('left') },
+  /* 14 */ { tiles: 108, kinds: 22, sec: 4.4, gravity: singleGravity('right') },
+  /* 15 */ { tiles: 108, kinds: 24, sec: 4.3, gravity: { bands: ['left', 'right'] } },
+  /* 16 */ { tiles: 120, kinds: 24, sec: 4.2, gravity: { bands: ['down', 'up'] } },
+  /* 17 */ { tiles: 120, kinds: 24, sec: 4.1, gravity: { bands: ['up', 'down'] } },
+  /* 18 */ { tiles: 120, kinds: 26, sec: 4.0, gravity: { bands: ['right', 'left'] } },
+  /* 19 */ { tiles: 120, kinds: 26, sec: 3.9, gravity: singleGravity('down') },
+  /* 20 */ { tiles: 126, kinds: 26, sec: 3.8, gravity: singleGravity('up') },
+  /* 21 */ { tiles: 126, kinds: 26, sec: 3.7, gravity: singleGravity('left') },
+  /* 22 */ { tiles: 126, kinds: 26, sec: 3.6, gravity: singleGravity('right') },
+  /* 23 */ { tiles: 126, kinds: 28, sec: 3.5, gravity: { bands: ['down', 'up', 'down'] } },
+  /* 24 */ { tiles: 126, kinds: 28, sec: 3.4, gravity: { bands: ['left', 'right', 'left'] } },
+  /* 25 */ { tiles: 126, kinds: 28, sec: 3.4, gravity: { bands: ['up', 'left', 'right'] } },
+  /* 26 */ { tiles: 126, kinds: 28, sec: 3.3, gravity: { bands: ['left', 'down', 'up', 'right'] } },
+  /* 27 */ { tiles: 126, kinds: 30, sec: 3.3, gravity: { bands: ['down', 'up', 'down', 'up'] } },
+  /* 28 */ { tiles: 126, kinds: 30, sec: 3.25, gravity: { bands: ['left', 'right', 'right', 'left'] } },
+  /* 29 */ { tiles: 126, kinds: 30, sec: 3.2, gravity: { bands: ['down', 'left', 'up', 'right'] } },
+  /* 30 */ { tiles: 126, kinds: 30, sec: 3.1, gravity: { bands: ['up', 'right', 'left', 'down'] } },
+];
 
-/** Минимум времени на уровень: 3 минуты */
+/** потолки бесконечного режима (как в оригинале 18×7 = 126 плиток) */
+const TILES_CAP = 126;
+const KINDS_CAP = 30;
+const SEC_PER_PAIR_MIN = 3.0;
+
+/** Бесконечный режим (31+): полосы 2–4, направления — детерминированная
+ *  «вращалка» от номера уровня: уровни не повторяются, но всегда сложные */
+function endlessRule(lv: number): LevelRule {
+  const bands = 2 + (lv % 3); // 2..4
+  const dirs: GravityDir[] = [];
+  for (let b = 0; b < bands; b++) {
+    dirs.push(L[(lv * 5 + b * 3 + Math.floor(lv / 7)) % 4]);
+  }
+  /* следим, чтобы полосы не совпали все в одну сторону — иначе это не «полосы» */
+  if (dirs.every((d) => d === dirs[0])) {
+    dirs[dirs.length - 1] = L[(lv + 1) % 4] === dirs[0] ? L[(lv + 2) % 4] : L[(lv + 1) % 4];
+  }
+  return { tiles: TILES_CAP, kinds: KINDS_CAP, sec: SEC_PER_PAIR_MIN, gravity: { bands: dirs } };
+}
+
+/** Правило уровня (классика): монотонная лестница до 30, дальше — бесконечный максимум */
+export function levelRuleFor(level: number): LevelRule {
+  const lv = Math.max(1, Math.floor(level));
+  return lv <= LADDER.length ? LADDER[lv - 1] : endlessRule(lv);
+}
+
+/* Время: минимум 3 минуты на уровне — поля плотные, карточек много */
 const MIN_LEVEL_TIME = 180;
 
 /* ============ Чекпоинты (сброс при проигрыше/выходе) ============ */
@@ -182,43 +276,25 @@ export function kidsTimeForLevel(pairs: number, level: number, harder: boolean):
 export const BONUS_CAPS = { hint: 15, shuffle: 10, freeze: 10 } as const;
 export type BonusKind = keyof typeof BONUS_CAPS;
 
-/** Целевое число плиток для уровня (лёгкие — маленькое поле) */
+/** Целевое число плиток для уровня (лестница Pao Pao, см. LADDER) */
 export function targetTilesForLevel(level: number): number {
-  const lv = Math.max(1, Math.floor(level));
-  if (isEasyLevel(lv)) return EASY_TILES;
-  return lv <= TILES_TARGET.length ? TILES_TARGET[lv - 1] : TILES_CAP;
+  return levelRuleFor(level).tiles;
 }
 
-/** Число видов плиток для уровня (лёгкие — как на первом, 18) */
+/** Число видов плиток для уровня (растёт с уровнем, потолок 30) */
 export function kindsForLevel(level: number): number {
-  const lv = Math.max(1, Math.floor(level));
-  if (isEasyLevel(lv)) return KINDS_START;
-  return Math.min(KINDS_START + (lv - 1) * KINDS_STEP, KINDS_CAP);
+  return levelRuleFor(level).kinds;
 }
 
-/* Гравитация: 1-й уровень и лёгкие — без падений, остальные чередуют
- * направления, как в классическом Pao Pao: вниз → вверх → влево → вправо */
-const GRAVITY_CYCLE: readonly GravityDir[] = ['down', 'up', 'left', 'right'];
-
-/** Направление падения камней для уровня */
-export function gravityForLevel(level: number): GravityDir {
-  const lv = Math.max(1, Math.floor(level));
-  if (lv === 1 || isEasyLevel(lv)) return 'none';
-  let n = 0;
-  for (let l = 2; l < lv; l++) {
-    if (!isEasyLevel(l)) n++;
-  }
-  return GRAVITY_CYCLE[n % GRAVITY_CYCLE.length];
+/** План падения камней для уровня (направления полос столбцов) */
+export function gravityForLevel(level: number): GravityPlan {
+  return levelRuleFor(level).gravity;
 }
 
-/** Секунд на уровень: pairs × сек/пару (сек/пару убывает с уровнем),
+/** Секунд на уровень: pairs × сек/пару из лестницы,
  *  но НЕ МЕНЬШЕ 3 минут — поле плотное и карточек много */
 export function timeForLevel(pairs: number, level: number): number {
-  const lv = Math.max(1, Math.floor(level));
-  const base = Math.max(SEC_PER_PAIR_MIN, SEC_PER_PAIR_START - (lv - 1) * SEC_PER_PAIR_STEP);
-  const depthBonus =
-    Math.min(lv - 1, SEC_PER_PAIR_LEVEL_CAP / SEC_PER_PAIR_LEVEL_STEP) * SEC_PER_PAIR_LEVEL_STEP;
-  return Math.max(MIN_LEVEL_TIME, Math.round(pairs * (base + depthBonus)));
+  return Math.max(MIN_LEVEL_TIME, Math.round(pairs * levelRuleFor(level).sec));
 }
 
 /**
@@ -320,7 +396,7 @@ export function configForLevel(level: number, areaW: number, areaH: number): Lev
     kinds,
     time,
     gravity: gravityForLevel(lv),
-    easy: isEasyLevel(lv),
+    easy: false,
   };
 }
 
@@ -353,7 +429,7 @@ export function kidsConfigForLevel(
     cols,
     kinds,
     time,
-    gravity: 'none',
+    gravity: NO_GRAVITY,
     easy: isEasyLevel(lv),
     theme,
   };
@@ -661,13 +737,59 @@ export function findAnyMatch(board: Cell[], rows: number, cols: number): [Point,
 
 /**
  * ГРАВИТАЦИЯ (как в классическом Pao Pao): после уборки пары оставшиеся
- * камни «падают» в заданном направлении — как будто выбиваешь камень,
- * и верхние камни падают вниз на его место. Плитки в каждой колонке
- * (или ряду) уплотняются к нужному краю; состав поля сохраняется.
- * Возвращает НОВЫЙ массив (для 'none' — исходный без изменений).
+ * камни «падают» — как будто выбиваешь камень, и верхние камни падают
+ * вниз на его место. ПЛАН: полосы столбцов, каждая — в свою сторону
+ * (вниз/вверх — уплотнение по столбцам полосы, влево/вправо — по рядам
+ * в пределах полосы). Состав поля сохраняется.
+ * Возвращает НОВЫЙ массив (пустой план — исходный без изменений).
  */
-export function applyGravity(board: Cell[], rows: number, cols: number, dir: GravityDir): Cell[] {
-  if (dir === 'none') return board;
+export function applyGravity(
+  board: Cell[],
+  rows: number,
+  cols: number,
+  plan: GravityPlan
+): Cell[] {
+  const bands = plan.bands.filter((d) => d !== 'none');
+  if (bands.length === 0) return board;
+  if (bands.length === 1) return applyGravityDir(board, rows, cols, bands[0]);
+
+  const nb: Cell[] = new Array(board.length).fill(null);
+  const bounds = bandBounds(cols, bands.length);
+  bands.forEach((dir, b) => {
+    const [c0, c1] = bounds[b];
+    if (dir === 'down' || dir === 'up') {
+      for (let c = c0; c <= c1; c++) {
+        const stack: Cell[] = [];
+        for (let r = 0; r < rows; r++) {
+          const t = board[r * cols + c];
+          if (t) stack.push(t);
+        }
+        for (let i = 0; i < stack.length; i++) {
+          const r = dir === 'down' ? rows - stack.length + i : i;
+          nb[r * cols + c] = stack[i];
+        }
+      }
+    } else {
+      for (let r = 0; r < rows; r++) {
+        const stack: Cell[] = [];
+        for (let c = c0; c <= c1; c++) {
+          const t = board[r * cols + c];
+          if (t) stack.push(t);
+        }
+        /* c1 — ВКЛЮЧИТЕЛЬНАЯ граница полосы: при N плитках они занимают
+           последние N клеток полосы, т.е. c1+1-N .. c1 */
+        for (let i = 0; i < stack.length; i++) {
+          const c = dir === 'right' ? c1 + 1 - stack.length + i : c0 + i;
+          nb[r * cols + c] = stack[i];
+        }
+      }
+    }
+  });
+  return nb;
+}
+
+/** Простой случай: вся доска едет в одну сторону */
+function applyGravityDir(board: Cell[], rows: number, cols: number, dir: GravityDir): Cell[] {
   const nb: Cell[] = new Array(board.length).fill(null);
   if (dir === 'down' || dir === 'up') {
     for (let c = 0; c < cols; c++) {

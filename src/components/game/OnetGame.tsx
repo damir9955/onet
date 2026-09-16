@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { IconFlag, IconFreeze, IconHint, IconPause, IconShuffle, IconSoundOff, IconSoundOn, IconStar } from './GameIcons';
+import { Ico3D } from './Ico3D';
+import { IconFlag, IconFreeze, IconHint, IconPause, IconShuffle, IconStar } from './GameIcons';
 import {
   BONUS_CAPS,
   CHECKPOINT_EVERY,
+  NO_GRAVITY,
   applyGravity,
   cellIndex,
   configForLevel,
@@ -21,6 +23,7 @@ import {
   type BonusKind,
   type Cell,
   type GravityDir,
+  type GravityPlan,
   type KindSkin,
   type LevelConfig,
   type LevelTheme,
@@ -30,13 +33,23 @@ import {
 import { stringsFor, type Lang } from '@/lib/onet/i18n';
 import { MEMORY_PREVIEW_SEC } from '@/lib/onet/memory';
 import { sound } from '@/lib/onet/sound';
-import { showRewardedAd, type RewardedResult } from '@/lib/ads/yandex';
+import {
+  downloadEverything,
+  ensureServiceWorker,
+  readInstallMarker,
+  readMarkerLS,
+  silentUpdate,
+  writeInstallMarker,
+} from '@/lib/onet/offline';
+import { preloadAdSdk, showRewardedAd, type RewardedResult } from '@/lib/ads/yandex';
 import Board, { type DyingTile, type NamePopup } from './Board';
+import BootLoader from './BootLoader';
 import MemoryGame from './MemoryGame';
 import ToddlerGame from './ToddlerGame';
 import TimeBar from './TimeBar';
 import {
   AdOfferModal,
+  AdPendingOverlay,
   ComboChip,
   ExitConfirmModal,
   GameOverModal,
@@ -103,6 +116,11 @@ const GRAVITY_ARROW: Record<GravityDir, string> = {
   left: '⬅',
   right: '➡',
 };
+/* Стрелки ПЛАНА гравитации: полосы столбцов, каждая — в свою сторону */
+const planArrows = (plan: GravityPlan): string => plan.bands.map((d) => GRAVITY_ARROW[d]).join('');
+const planActive = (plan: GravityPlan): boolean => plan.bands.some((d) => d !== 'none');
+const planTitle = (plan: GravityPlan, labels: Record<GravityDir, string>, split: string): string =>
+  plan.bands.length > 1 ? split : labels[plan.bands[0] ?? 'none'];
 const WRONG_PENALTY_SEC = 2;
 
 /** Для чего показываем рекламу: бонус, повтор уровня или пропуск (детский) */
@@ -237,8 +255,8 @@ interface Session {
   combo: number;
   lastMatchAt: number;
   pairsLeft: number;
-  /** гравитация уровня: куда падают камни после уборки пары */
-  gravity: GravityDir;
+  /** гравитация уровня: полосы столбцов, каждая падает в свою сторону */
+  gravity: GravityPlan;
   /** лёгкий уровень (каждый 3-й) — передышка */
   easy: boolean;
   /** тема детского уровня (звери / фрукты-овощи / вперемешку) */
@@ -268,6 +286,10 @@ export default function OnetGame() {
   const [adOffer, setAdOffer] = useState<BonusKind | null>(null);
   /** идёт рекламная заглушка (РСЯ недоступна) — хранит колбэк завершения */
   const [simAd, setSimAd] = useState<null | { done: () => void }>(null);
+  /** ждём рекламу (SDK/показ) — мгновенная обратная связь на клик:
+     тёмный экран «Загружаем рекламу…», чтобы после нажатия ничего
+     не «висело в тишине» (фидбек v1.6.0) */
+  const [adPending, setAdPending] = useState(false);
   /** любая реклама в процессе — кнопки блокируются */
   const [adBusy, setAdBusy] = useState(false);
   /** открыт ли экран турнирной таблицы */
@@ -308,15 +330,57 @@ export default function OnetGame() {
     document.documentElement.lang = progress.lang;
   }, [progress.lang]);
 
-  /* Service Worker: оболочка игры кладётся в кеш — установленное
-     приложение открывается МГНЕННО (и работает без сети). Только
-     продакшн: в dev-сервере SW ломает горячую перезагрузку. */
+  /* Service Worker + полная офлайн-установка: см. lib/onet/offline.ts.
+     Логика запуска (фидбек v1.6.0):
+     - маркер «игра скачана целиком» есть → меню СРАЗУ (мгновенная загрузка);
+     - маркера нет → загрузчик с полоской: скачиваем ВСЕ файлы, пишем маркер;
+     - на сервере новее версия → фоновое обновление НЕЗАМЕТНО, новая версия
+       применится при следующем запуске. */
+  const [boot, setBoot] = useState<'check' | 'download' | 'ready' | 'error'>(() => {
+    /* мгновенный путь без единого кадра задержки: маркер в localStorage */
+    const m = readMarkerLS();
+    return m ? 'ready' : 'check';
+  });
+  const [bootProgress, setBootProgress] = useState({ done: 0, total: 0 });
+
+  const runBootDownload = useCallback(() => {
+    setBoot('download');
+    setBootProgress({ done: 0, total: 0 });
+    downloadEverything((p) => setBootProgress({ done: p.done, total: p.total }))
+      .then(async (r) => {
+        if (r.ok) {
+          await writeInstallMarker(r.files);
+          setBoot('ready');
+        } else {
+          setBoot('error');
+        }
+      })
+      .catch(() => setBoot('error'));
+  }, []);
+
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') return;
-    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      /* нет HTTPS / приватный режим — просто играем без кеша */
-    });
+    let cancelled = false;
+    (async () => {
+      /* SW регистрируем как можно раньше — он подхватит все фоновые запросы */
+      ensureServiceWorker();
+      /* ПРЕДЗАГРУЗКА SDK рекламы: к клику «Смотреть рекламу» скрипт РСЯ
+         уже готов — показ мгновенный, без тишины после нажатия
+         (в проде; в деве — не мешаем консоль внешним скриптом) */
+      if (process.env.NODE_ENV === 'production') preloadAdSdk();
+      const marker = await readInstallMarker();
+      if (cancelled) return;
+      if (marker) {
+        /* игра уже скачана: мгновенно в меню; если сервер новее —
+           обновление скачается тихо в фоне и применится в другой запуск */
+        setBoot('ready');
+        silentUpdate();
+      } else {
+        runBootDownload();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   /* Таймер на "дедлайне": endsAtRef — момент окончания времени.
@@ -581,7 +645,7 @@ export default function OnetGame() {
         combo: 0,
         lastMatchAt: 0,
         pairsLeft: 0,
-        gravity: 'none',
+        gravity: NO_GRAVITY,
         easy: false,
         theme: themeForLevel(level),
       });
@@ -626,7 +690,7 @@ export default function OnetGame() {
         combo: 0,
         lastMatchAt: 0,
         pairsLeft: 0,
-        gravity: 'none',
+        gravity: NO_GRAVITY,
         easy: false,
         theme: themeForLevel(level),
       });
@@ -972,11 +1036,8 @@ export default function OnetGame() {
           nb0[selIdx] = null;
           nb0[idx] = null;
           /* Гравитация как в Pao Pao: оставшиеся камни падают на место
-             убранной пары (вниз/вверх/влево/вправо — направление уровня) */
-          const nb =
-            session.gravity !== 'none'
-              ? applyGravity(nb0, session.rows, session.cols, session.gravity)
-              : nb0;
+             убранной пары — полосы столбцов, каждая в свою сторону */
+          const nb = applyGravity(nb0, session.rows, session.cols, session.gravity);
 
           const now = Date.now();
           const combo =
@@ -1228,9 +1289,10 @@ export default function OnetGame() {
 
   /**
    * Показать рекламу с вознаграждением (блок РСЯ R-M-20010879-1).
-   * Пока идёт показ — игровое время СТОИТ. Если реклама недоступна
-   * (дев-среда / нет показа / блокировщик) — заглушка с отсчётом,
-   * чтобы игрок гарантированно получил награду и не застревал.
+   * Пока идёт показ — игровое время СТОИТ. Пока реклама грузится —
+   * виден экран «Загружаем рекламу…» (нажал — сразу отклик).
+   * Если реклама недоступна (дев-среда / нет показа / блокировщик) —
+   * заглушка с отсчётом, чтобы игрок гарантированно получил награду.
    */
   const runAd = useCallback(
     async (purpose: AdPurpose) => {
@@ -1239,18 +1301,20 @@ export default function OnetGame() {
       setAdBusy(true);
       adPlayingRef.current = true;
       setAdOffer(null);
+      setAdPending(true);
       let result: RewardedResult;
       try {
         result = await showRewardedAd();
         if (result === 'error') {
-          /* РСЯ недоступна — показываем заглушку */
-          result = await new Promise<RewardedResult>((resolve) => {
+          /* РСЯ недоступна — показываем заглушку (поверх экрана загрузки) */
+          await new Promise<RewardedResult>((resolve) => {
             setSimAd({ done: () => resolve('rewarded') });
           });
         }
       } catch {
         result = 'closed';
       }
+      setAdPending(false);
       adPlayingRef.current = false;
       setSimAd(null);
       adBusyRef.current = false;
@@ -1331,17 +1395,39 @@ export default function OnetGame() {
   /* победу на уровне-чекпоинте отмечаем «прогресс сохранён» */
   const winSaved = !!winInfo && winInfo.mode !== 'kids' && isCheckpointLevel(winInfo.level);
 
+  /* ПОЛНАЯ УСТАНОВКА ЕЩЁ НЕ ЗАВЕРШЕНА — загрузочный экран с полоской.
+     После скачивания всех файлов появится меню (мгновенно при повторных
+     запусках — ранний выход из boot-инициализатора выше). */
+  if (boot !== 'ready') {
+    return (
+      <div className="app-viewport bg-gradient-to-b from-teal-100 via-emerald-50 to-amber-100">
+        <BootLoader
+          t={t}
+          state={boot}
+          done={bootProgress.done}
+          total={bootProgress.total}
+          onRetry={runBootDownload}
+        />
+      </div>
+    );
+  }
+
   return (
     /* Горизонтальный вьюпорт: в портретной ориентации экран поворачивается
         CSS'ом (.app-viewport из globals.css) — игра сразу открывается
         в горизонтальном режиме на любом устройстве.
-        Детский режим — тёплый персиковый фон (отличается от бирюзового
-        классического, не сливается с ним и с меню) */
+        Детские режимы — каждый в СВОЁМ мягком цвете (как в меню):
+        ONET-детский янтарный, «Найди пары» небесно-голубой,
+        «Тыкай пары» розовый — классика остаётся бирюзовой */
     <div
       className={
         'app-viewport ' +
         (isKids
-          ? 'bg-gradient-to-b from-amber-100 via-orange-50 to-rose-100'
+          ? isMemory
+            ? 'bg-gradient-to-b from-sky-100 via-blue-50 to-indigo-100'
+            : isToddler
+              ? 'bg-gradient-to-b from-rose-100 via-pink-50 to-orange-100'
+              : 'bg-gradient-to-b from-amber-100 via-orange-50 to-rose-100'
           : 'bg-gradient-to-b from-teal-100 via-emerald-50 to-amber-100')
       }
     >
@@ -1352,13 +1438,27 @@ export default function OnetGame() {
           {!isMemory && !isToddler && (
           <header className="px-2 pt-[max(0.375rem,env(safe-area-inset-top))]">
             <div className="flex items-center gap-2">
+              {/* Пауза — СЛЕВА и «обычная» (фидбек v1.7.0): простой белый
+                  кружок с тёмным значком, как стандартная кнопка плеера;
+                  видна только во время игры */}
+              {phase === 'playing' && (
+                <button
+                  type="button"
+                  onClick={pauseGame}
+                  disabled={adBusy}
+                  aria-label={t.pause}
+                  className="game-action-btn game-action-btn--sm game-action-btn--plain"
+                >
+                  <IconPause className="h-5 w-5" aria-hidden="true" />
+                </button>
+              )}
               <span
                 className="shrink-0 rounded-full bg-white/80 px-3 py-1 text-sm font-black text-teal-900 shadow-sm"
                 title={
                   isKids
                     ? t.themeLabel(session?.theme ?? 'mixed')
                     : session
-                      ? t.gravity[session.gravity] || undefined
+                      ? planTitle(session.gravity, t.gravity, t.gravitySplit) || undefined
                       : undefined
                 }
               >
@@ -1366,8 +1466,8 @@ export default function OnetGame() {
                 {isKids && session?.theme && (
                   <span className="text-teal-700/80"> · {t.themeLabel(session.theme)}</span>
                 )}
-                {!isKids && session && session.gravity !== 'none' && (
-                  <span aria-hidden="true"> {GRAVITY_ARROW[session.gravity]}</span>
+                {!isKids && session && planActive(session.gravity) && (
+                  <span aria-hidden="true"> {planArrows(session.gravity)}</span>
                 )}
               </span>
               {showCpChip && (
@@ -1386,7 +1486,7 @@ export default function OnetGame() {
                 </span>
               )}
               <span className="flex shrink-0 items-center gap-1.5 text-sm font-black tabular-nums text-teal-900">
-                <IconStar className="h-4.5 w-4.5" aria-hidden="true" />
+                <Ico3D name="star" fallback={IconStar} className="h-4.5 w-4.5" alt="" />
                 {isKids ? session?.score ?? 0 : progress.totalScore + (session?.score ?? 0)}
               </span>
               <div className="min-w-0 flex-1">
@@ -1403,7 +1503,7 @@ export default function OnetGame() {
                 aria-label={t.hintLeft(bonuses.hint)}
                 className="game-action-btn game-action-btn--sm game-action-btn--hint"
               >
-                <IconHint className="h-6 w-6" />
+                <Ico3D name="hint" fallback={IconHint} className="h-full w-full" alt="" />
                 <span
                   className={`game-action-badge ${bonuses.hint <= 0 ? 'game-action-badge--zero' : ''}`}
                 >
@@ -1417,7 +1517,7 @@ export default function OnetGame() {
                 aria-label={t.shuffleLeft(bonuses.shuffle)}
                 className="game-action-btn game-action-btn--sm game-action-btn--shuffle"
               >
-                <IconShuffle className="h-6 w-6" />
+                <Ico3D name="shuffle" fallback={IconShuffle} className="h-full w-full" alt="" />
                 <span
                   className={`game-action-badge ${bonuses.shuffle <= 0 ? 'game-action-badge--zero' : ''}`}
                 >
@@ -1433,32 +1533,15 @@ export default function OnetGame() {
                 }
                 className="game-action-btn game-action-btn--sm game-action-btn--freeze"
               >
-                <IconFreeze className="h-6 w-6" />
+                <Ico3D name="freeze" fallback={IconFreeze} className="h-full w-full" alt="" />
                 <span
                   className={`game-action-badge ${frozenLeft > 0 ? 'game-action-badge--freeze' : bonuses.freeze <= 0 ? 'game-action-badge--zero' : ''}`}
                 >
                   {frozenLeft > 0 ? frozenLeft : bonuses.freeze}
                 </span>
               </button>
-              <button
-                type="button"
-                onClick={handleToggleSound}
-                aria-label={sound.enabled ? t.soundOn : t.soundOff}
-                className="game-action-btn game-action-btn--sm game-action-btn--sound"
-              >
-                {sound.enabled ? <IconSoundOn className="h-6 w-6" /> : <IconSoundOff className="h-6 w-6" />}
-              </button>
-              {phase === 'playing' && (
-                <button
-                  type="button"
-                  onClick={pauseGame}
-                  disabled={adBusy}
-                  aria-label={t.pause}
-                  className="game-action-btn game-action-btn--sm game-action-btn--pause"
-                >
-                  <IconPause className="h-6 w-6" />
-                </button>
-              )}
+              {/* Звук — ТОЛЬКО в настройках (фидбек v1.6.0): на уровнях
+                  кнопки звука больше нет */}
             </div>
           </header>
           )}
@@ -1500,7 +1583,6 @@ export default function OnetGame() {
                 onPause={pauseGame}
                 onExit={goMenu}
                 onSkip={() => setSkipOffer(true)}
-                onToggleSound={handleToggleSound}
               />
             )}
             {session && isToddler && (
@@ -1513,7 +1595,6 @@ export default function OnetGame() {
                 paused={phase !== 'playing'}
                 onNext={handleToddlerWin}
                 onPause={pauseGame}
-                onToggleSound={handleToggleSound}
               />
             )}
             {session && !isMemory && !isToddler && (
@@ -1563,6 +1644,9 @@ export default function OnetGame() {
         <PauseModal
           t={t}
           level={session.level}
+          /* классика: фон под паузой НЕ просвечивает (фидбек v1.6.0);
+             детский — прежняя полупрозрачная вуаль */
+          cover={!isKids}
           onResume={resumeGame}
           onMenu={requestExit}
           onSkipLevel={isKids && !isToddler ? () => setSkipOffer(true) : undefined}
@@ -1644,6 +1728,11 @@ export default function OnetGame() {
 
       {/* Заглушка рекламы (РСЯ недоступна: дев-среда / нет показа) */}
       {simAd && <SimAdOverlay t={t} seconds={SIM_AD_SEC} onDone={simAd.done} />}
+
+      {/* Мгновенный отклик на клик «Смотреть рекламу»: пока SDK/показ
+          готовится — тёмный экран с крутилкой (фидбек v1.6.0: раньше
+          нажал — и «ничего не появляется») */}
+      {adPending && !simAd && <AdPendingOverlay t={t} />}
 
       {/* Турнирная таблица */}
       {showLeaderboard && phase === 'menu' && (

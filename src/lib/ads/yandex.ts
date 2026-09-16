@@ -49,9 +49,17 @@ declare global {
 }
 
 const SDK_URL = 'https://yandex.ru/ads/system/context.js';
-const SDK_LOAD_TIMEOUT_MS = 8000;
+const SDK_LOAD_TIMEOUT_MS = 6000;
 /** если за это время ни один колбэк не пришёл — считаем ошибкой */
-const AD_SETTLE_TIMEOUT_MS = 20000;
+const AD_SETTLE_TIMEOUT_MS = 15000;
+/** onClose может прийти РАНЬШЕ onRewarded (реальная гонка в SDK РСЯ —
+ *  фидбек v1.7.0: «реклама проходит, но ничего не меняется»): даём
+ *  награде столько времени, чтобы «догнать» закрытие */
+const AD_REWARD_GRACE_MS = 2500;
+/** если onRewarded не пришёл вовсе, но реклама была открыта столько —
+ *  считаем досмотром (у веб-rewarded РСЯ колбэк награды нередко
+ *  пропадает вовсе, а игрок ролик посмотрел) */
+const AD_MIN_VIEW_MS = 8000;
 
 let sdkPromise: Promise<boolean> | null = null;
 
@@ -90,6 +98,18 @@ function ensureSdk(): Promise<boolean> {
 }
 
 /**
+ * ПРЕДЗАГРУЗКА SDK рекламы (фидбек v1.6.0): раньше скрипт РСЯ начинал
+ * качаться только по клику «Смотреть рекламу» — на телефоне это до
+ * 8 секунд ТИШИНЫ (кликнешь — ничего не появляется), а сам показ
+ * вызывался уже вне жеста пользователя и мог опаздывать поверх
+ * перезапущенной игры. Теперь SDK грузится заранее (сразу после
+ * загрузки игры), и к моменту клика реклама показывается мгновенно.
+ */
+export function preloadAdSdk(): void {
+  void ensureSdk();
+}
+
+/**
  * Показать rewarded-видео РСЯ. Вызывать строго из обработчика клика.
  * Возвращает 'rewarded' | 'closed' | 'error' (см. RewardedResult).
  */
@@ -101,12 +121,17 @@ export async function showRewardedAd(): Promise<RewardedResult> {
   return new Promise<RewardedResult>((resolve) => {
     let settled = false;
     let rewarded = false;
+    /* приходил ли onRewarded вообще (даже с false) */
+    let rewardedFired = false;
     let settleTimer = 0;
+    let closeGraceTimer = 0;
+    let renderedAt = 0;
 
     const finish = (result: RewardedResult) => {
       if (settled) return;
       settled = true;
       if (settleTimer) window.clearTimeout(settleTimer);
+      if (closeGraceTimer) window.clearTimeout(closeGraceTimer);
       resolve(result);
     };
 
@@ -117,24 +142,50 @@ export async function showRewardedAd(): Promise<RewardedResult> {
       type: 'rewarded',
       platform: isMobile() ? 'mobile' : 'desktop',
       onRewarded: (isViewed: boolean) => {
+        rewardedFired = true;
         if (isViewed) {
           rewarded = true;
           finish('rewarded');
         }
+        /* isViewed=false — сразу награду НЕ отдаём: дождёмся onClose */
       },
-      onClose: () => finish(rewarded ? 'rewarded' : 'closed'),
+      onClose: () => {
+        /* ГОНКА КОЛБЭКОВ (фидбек v1.7.0): SDK часто присылает onClose
+           ДО onRewarded (или вовсе без него) — раньше мы тут же решали
+           «closed», игрок смотрел рекламу и НЕ получал уровень.
+           Теперь: ждём grace-период, вдруг награда придёт следом; если
+           её не было вовсе, а реклама висела достаточно долго —
+           честно считаем досмотром. */
+        if (closeGraceTimer) window.clearTimeout(closeGraceTimer);
+        closeGraceTimer = window.setTimeout(() => {
+          if (rewarded) finish('rewarded');
+          else if (rewardedFired) finish('closed');
+          else if (renderedAt && Date.now() - renderedAt >= AD_MIN_VIEW_MS) finish('rewarded');
+          else finish('closed');
+        }, AD_REWARD_GRACE_MS);
+      },
       onError: () => finish('error'),
     };
 
+    const renderNow = () => {
+      try {
+        renderedAt = Date.now();
+        manager.render(options);
+      } catch {
+        finish('error');
+      }
+    };
+
     try {
-      window.yaContextCb = window.yaContextCb ?? [];
-      window.yaContextCb.push(() => {
-        try {
-          manager.render(options);
-        } catch {
-          finish('error');
-        }
-      });
+      if (window.Ya?.Context?.AdvManager) {
+        /* SDK уже загружен — рендерим НАПРЯМУЮ, без очереди yaContextCb
+           (очередь могла уже быть обработана при предзагрузке — тогда
+           push мог бы никогда не исполниться) */
+        renderNow();
+      } else {
+        window.yaContextCb = window.yaContextCb ?? [];
+        window.yaContextCb.push(renderNow);
+      }
     } catch {
       finish('error');
     }

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { APP_VERSION } from '@/lib/onet/appVersion';
 
 export const metadata: Metadata = {
   title: 'Клик-Клак: Соедини пары — найди одинаковые картинки',
@@ -7,6 +8,9 @@ export const metadata: Metadata = {
     'Игра «Клик-Клак: Соедини пары»: нажимай на две одинаковые картинки, чтобы соединить их. 90 реалистичных картинок — звери, фрукты и овощи. Классика с чекпоинтами и турнирной таблицей плюс детский режим с игрой «Найди одинаковые». Чем дальше, тем сложнее!',
   applicationName: 'Клик-Клак: Соедини пары',
   manifest: '/manifest.webmanifest',
+  /* версия игры в HTML: по ней клиент узнаёт о новой версии на сервере
+     и незаметно обновляется в фоне (см. lib/onet/offline.ts — silentUpdate) */
+  other: { 'kk-version': APP_VERSION },
   keywords: [
     'клик-клак',
     'клик-линк',

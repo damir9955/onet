@@ -16,7 +16,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { IconPause, IconSoundOff, IconSoundOn } from './GameIcons';
+import { IconPause } from './GameIcons';
 import { pickKinds, themeForLevel, type KindSkin, type LevelTheme } from '@/lib/onet/engine';
 import { createMemoryDeck, memoryGridForCards, toddlerPairsForLevel } from '@/lib/onet/memory';
 import { sound } from '@/lib/onet/sound';
@@ -32,7 +32,6 @@ export interface ToddlerGameProps {
   /** уровень пройден: салют уже показали, стартуем следующий */
   onNext: (finishedLevel: number) => void;
   onPause: () => void;
-  onToggleSound: () => void;
 }
 
 interface Pop {
@@ -141,7 +140,6 @@ export default function ToddlerGame({
   paused,
   onNext,
   onPause,
-  onToggleSound,
 }: ToddlerGameProps) {
   const theme: LevelTheme = themeForLevel(level);
   const pairs = useMemo(() => toddlerPairsForLevel(level), [level]);
@@ -276,6 +274,15 @@ export default function ToddlerGame({
       {/* Шапка: только уровень, звук и пауза — ничего лишнего */}
       <header className="px-2 pt-[max(0.375rem,env(safe-area-inset-top))]">
         <div className="flex items-center gap-2">
+          {/* Пауза — СЛЕВА и «обычная» (фидбек v1.7.0) — как в классике */}
+          <button
+            type="button"
+            onClick={onPause}
+            aria-label={t.pause}
+            className="game-action-btn game-action-btn--sm game-action-btn--plain"
+          >
+            <IconPause className="h-5 w-5" aria-hidden="true" />
+          </button>
           <span
             className="shrink-0 rounded-full bg-white/80 px-3 py-1 text-sm font-black text-teal-900 shadow-sm"
             title={t.themeLabel(theme)}
@@ -286,22 +293,8 @@ export default function ToddlerGame({
             {t.pairsLeft((deck.length - matched.length) / 2)}
           </span>
           <div className="min-w-0 flex-1" />
-          <button
-            type="button"
-            onClick={onToggleSound}
-            aria-label={soundOn ? t.soundOn : t.soundOff}
-            className="game-action-btn game-action-btn--sm game-action-btn--sound"
-          >
-            {soundOn ? <IconSoundOn className="h-6 w-6" /> : <IconSoundOff className="h-6 w-6" />}
-          </button>
-          <button
-            type="button"
-            onClick={onPause}
-            aria-label={t.pause}
-            className="game-action-btn game-action-btn--sm game-action-btn--pause"
-          >
-            <IconPause className="h-6 w-6" />
-          </button>
+          {/* Звук — только в настройках (фидбек v1.6.0): кнопки звука
+              на уровнях больше нет */}
         </div>
       </header>
 
